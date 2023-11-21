@@ -169,7 +169,7 @@ int main() {
 
                                 for (int k1 = 0; k1 < K; k1++) {
                                     if (k1 != k) {
-                                        for (int m = 0; m < N; m++) {
+                                        for (auto [m, data]: users) {
                                             if (m != n) {
                                                 sum += s0[t][n][k1][r] * p[t][m][k1][r] * exp(-d[n][r][k1][m]);
                                             }
