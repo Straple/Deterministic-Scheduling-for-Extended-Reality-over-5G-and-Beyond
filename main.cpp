@@ -223,12 +223,10 @@ inline void writeDouble(double x, int output_len) {
     writeChar('0' + t);
 }
 
-//#define VERIFY_G
-//#define READ_POWER
-#define FAST_STREAM
+//#define FAST_STREAM
 
 int main() {
-    //std::ifstream cin("input.txt");
+    std::ifstream cin("input.txt");
     std::ios::sync_with_stdio(false);
     std::cin.tie(0);
     std::cout.tie(0);
@@ -326,18 +324,6 @@ int main() {
     // p[t][n][k][r]
     vector<vector<vector<vector<double>>>> p(T, vector(N, vector(K, vector<double>(R))));
 
-#ifdef READ_POWER
-    for (int t = 0; t < T; t++) {
-        for (int k = 0; k < K; k++) {
-            for (int r = 0; r < R; r++) {
-                for (int n = 0; n < N; n++) {
-                    cin >> p[t][n][k][r];
-                }
-            }
-        }
-    }
-#endif
-
     // ============
     // ==SOLUTION==
     // ============
@@ -346,13 +332,13 @@ int main() {
     for (int j = 0; j < J; j++) {
         event_add[Queries[j].t0].push_back(j);
         event_remove[Queries[j].t1].push_back(j);
+
     }
 
     struct data {
         int j; // номер окна
         double g;
     };
-
 
     auto calc_g = [&](int t, int n) { // NOLINT
         // dp_sum_noeq[k][r]
@@ -631,93 +617,6 @@ int main() {
             }
         }
     }
-
-#ifdef VERIFY_G
-    {
-        // NOLINTNEXTLINE
-        auto build_s_krnt = [&]() {
-            // s[k][r][n][t]
-            vector<vector<vector<vector<double>>>> s(K, vector(R, vector(N, vector<double>(T))));
-
-            for (int k = 0; k < K; k++) {
-                for (int r = 0; r < R; r++) {
-                    for (int n = 0; n < N; n++) {
-                        for (int t = 0; t < T; t++) {
-
-                            double prod = 1;
-                            for (int m = 0; m < N; m++) {
-                                if (m != n) {
-                                    prod *= exp(d[n][m][k][r] * (p[t][m][k][r] > 0 ? 1 : 0));
-                                }
-                            }
-                            prod *= p[t][n][k][r];
-                            prod *= s0[t][n][k][r];
-
-                            double sum = 1;
-                            for (int k1 = 0; k1 < K; k1++) {
-                                if (k1 != k) {
-                                    for (int n1 = 0; n1 < N; n1++) {
-                                        if (n1 != n) {
-                                            sum += s0[t][n][k1][r] * p[t][n1][k1][r] * exp(-d[n][n1][k1][r]);
-                                        }
-                                    }
-                                }
-                            }
-
-                            s[k][r][n][t] = prod / sum;
-                        }
-                    }
-                }
-            }
-            return s;
-        };
-
-        auto build_s_knt = [&](vector<vector<vector<vector<double>>>> s) {
-            vector<vector<vector<double>>> s_cur(K, vector(N, vector<double>(T)));
-            for (int k = 0; k < K; k++) {
-                for (int n = 0; n < N; n++) {
-                    for (int t = 0; t < T; t++) {
-                        double prod = 1;
-                        int count = 0;
-                        for (int r = 0; r < R; r++) {
-                            if (p[t][n][k][r] > 0) {
-                                count++;
-                                prod *= s[k][r][n][t];
-                            }
-                        }
-
-                        s_cur[k][n][t] = std::pow(prod, 1.0 / count);
-                    }
-                }
-            }
-            return s_cur;
-        };
-
-        auto build_g = [&](vector<vector<vector<double>>> s) {
-            vector<double> g(J);
-            for (int j = 0; j < J; j++) {
-                int n = Queries[j].user_id;
-                for (int t = Queries[j].t0; t <= Queries[j].t1; t++) {
-                    for (int k = 0; k < K; k++) {
-                        for (int r = 0; r < R; r++) {
-                            g[j] += (p[t][n][k][r] > 0 ? 1 : 0) * log2(1 + s[k][n][t]);
-                        }
-                    }
-                }
-                g[j] *= 192;
-            }
-            return g;
-        };
-
-        auto correct_g_maybe = build_g(build_s_knt(build_s_krnt()));
-        double error = 0;
-        for (int j = 0; j < J; j++) {
-            cout << correct_g_maybe[j] << '\n';
-        }
-        //cout << '\n';
-        //cout << "error: " << error << '\n';
-    }
-#endif
 
     // ==========
     // ==OUTPUT==
