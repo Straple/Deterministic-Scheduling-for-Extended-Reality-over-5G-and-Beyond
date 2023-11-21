@@ -8,7 +8,6 @@ int main() {
     std::cin.tie(0);
     std::cout.tie(0);
 
-
     // ===========
     // ==READING==
     // ===========
@@ -31,13 +30,28 @@ int main() {
         }
     }
 
-    // d[n][r][k][m]
-    vector<vector<vector<vector<double>>>> d(N, vector(R, vector(K, vector<double>(N))));
+    // exp_d[n][m][k][r]
+    vector<vector<vector<vector<double>>>> exp_d(N, vector(N, vector(K, vector<double>(R))));
     for (int k = 0; k < K; k++) {
         for (int r = 0; r < R; r++) {
             for (int m = 0; m < N; m++) {
                 for (int n = 0; n < N; n++) {
-                    cin >> d[n][r][k][m];
+                    cin >> exp_d[n][m][k][r];
+                    exp_d[n][m][k][r] = exp(exp_d[n][m][k][r]);
+                }
+            }
+        }
+    }
+
+    // product_exp_d[n][r][k]
+    vector<vector<vector<double>>> product_exp_d(N, vector(K, vector<double>(R, 1)));
+    for (int n = 0; n < N; n++) {
+        for (int m = 0; m < N; m++) {
+            if (m != n) {
+                for (int k = 0; k < K; k++) {
+                    for (int r = 0; r < R; r++) {
+                        product_exp_d[n][k][r] *= exp_d[n][m][k][r];
+                    }
                 }
             }
         }
@@ -84,7 +98,7 @@ int main() {
 
     struct data {
         int j; // номер окна
-        double g; // TODO: calculate this
+        double g;
     };
 
     map<int, data> users;
@@ -93,9 +107,6 @@ int main() {
         // add
         for (int j: event_add[t]) {
             int n = Queries[j].user_id;
-            if (users.contains(n)) {
-                exit(1);
-            }
             users[n] = {j, 0};
         }
 
@@ -144,52 +155,58 @@ int main() {
 
         vector<int> need_delete;
         for (auto &[n, data]: users) {
-            double sum = 0;
-            for (int k = 0; k < K; k++) {
-                double s_cur;
-                {
-                    double prod = 1;
-                    int count = 0;
-                    for (int r = 0; r < R; r++) {
-                        if (p[t][n][k][r] > 0) {
-                            count++;
 
-                            double s;
-                            {
-                                double prod = 1;
-                                for (int m = 0; m < N; m++) {
-                                    if (m != n) {
-                                        prod *= exp(d[n][r][k][m] * (p[t][n][k][r] > 0 ? 1 : 0));
-                                    }
-                                }
-                                prod *= p[t][n][k][r];
-                                prod *= s0[t][n][k][r];
-
-                                double sum = 1;
-
-                                for (int k1 = 0; k1 < K; k1++) {
-                                    if (k1 != k) {
-                                        for (auto [m, data]: users) {
-                                            if (m != n) {
-                                                sum += s0[t][n][k1][r] * p[t][m][k1][r] * exp(-d[n][r][k1][m]);
-                                            }
-                                        }
-                                    }
-                                }
-
-                                s = prod / sum;
+            // dp_sum_noeq[k][r]
+            vector<vector<double>> dp_sum_noeq(K, vector<double>(R, 1));
+            // dp_sum[k][r]
+            vector<vector<double>> dp_sum(K, vector<double>(R));
+            {
+                for (auto [m, data]: users) {
+                    if (m != n) {
+                        for (int k = 0; k < K; k++) {
+                            for (int r = 0; r < R; r++) {
+                                dp_sum[k][r] += s0[t][n][k][r] * p[t][m][k][r] / exp_d[n][m][k][r];
                             }
-                            prod *= s;
                         }
                     }
-
-                    s_cur = std::pow(prod, 1.0 / count);
                 }
+
+                for (int k = 0; k < K; k++) {
+                    for (int k1 = 0; k1 < K; k1++) {
+                        if (k != k1) {
+                            for (int r = 0; r < R; r++) {
+                                dp_sum_noeq[k][r] += dp_sum[k1][r];
+                            }
+                        }
+                    }
+                }
+            }
+
+            double sum = 0;
+            for (int k = 0; k < K; k++) {
+
+                double accum_prod = 1;
                 int count = 0;
                 for (int r = 0; r < R; r++) {
-                    count += p[t][n][k][r] > 0;
+                    if (p[t][n][k][r] > 0) {
+                        count++;
+
+                        accum_prod *= p[t][n][k][r];
+                        accum_prod *= s0[t][n][k][r];
+                        accum_prod *= product_exp_d[n][k][r];
+                        accum_prod /= dp_sum_noeq[k][r];
+
+                        // kek: 11.2449
+                        // kek: 11.2449
+                        // kek: 1
+                        // kek: 1
+                        // kek: 1
+                        // kek: 1
+                        // cout << "kek: " << dp_sum_noeq[k][r] << '\n';
+                    }
                 }
-                sum += count * log2(1 + s_cur);
+
+                sum += count * log2(1 + std::pow(accum_prod, 1.0 / count));
             }
             data.g += 192 * sum;
 
