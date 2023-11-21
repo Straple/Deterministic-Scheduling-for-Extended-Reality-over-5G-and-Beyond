@@ -3,7 +3,7 @@
 using namespace std;
 
 int main() {
-    //std::ifstream cin("input.txt");
+    // std::ifstream cin("input.txt");
     std::ios::sync_with_stdio(false);
     std::cin.tie(0);
     std::cout.tie(0);
@@ -162,8 +162,6 @@ int main() {
     struct data {
         int j; // номер окна
         double g; // TODO: calculate this
-
-        double sum_p;
     };
 
     map<int, data> users;
@@ -175,21 +173,21 @@ int main() {
             if (users.contains(n)) {
                 exit(1);
             }
-            users[n] = {j, 0, 0};
+            users[n] = {j, 0};
         }
+
+        vector<pair<double, int>> kek;
+        for (auto [n, data]: users) {
+            auto [TBS, user_id, t0, t1] = Queries[data.j];
+            double weight = pow(t1 - t + 1, 4);
+            weight *= pow(TBS - data.g, 6);
+            weight = 1 / weight;
+            kek.emplace_back(weight, n);
+        }
+        sort(kek.begin(), kek.end());
 
         // set power in time t
         {
-            vector<pair<double, int>> kek;
-            for (auto [n, data]: users) {
-                auto [TBS, user_id, t0, t1] = Queries[data.j];
-                double weight = pow(t1 - t + 1, 4);
-                weight *= pow(TBS, 6);
-                weight = 1 / weight;
-                kek.emplace_back(weight, n);
-            }
-            sort(kek.begin(), kek.end());
-
             double sum_weight = 0;
             for (auto [weight, n]: kek) {
                 sum_weight += weight;
@@ -219,7 +217,71 @@ int main() {
             }
         }
 
+        // update g
 
+        vector<vector<vector<double>>> s(K, vector(R, vector<double>(N)));
+
+        for (auto [weight, n]: kek) {
+            for (int k = 0; k < K; k++) {
+                for (int r = 0; r < R; r++) {
+
+                    double prod = 1;
+                    for (int m = 0; m < N; m++) {
+                        if (m != n) {
+                            prod *= exp(d[k][m][r][n] * (p[k][r][n][t] > 0 ? 1 : 0));
+                        }
+                    }
+                    prod *= p[k][r][n][t];
+                    prod *= s0[k][r][n][t];
+
+                    double sum = 1;
+                    for (int k1 = 0; k1 < K; k1++) {
+                        if (k1 != k) {
+                            for (int n1 = 0; n1 < N; n1++) {
+                                if (n1 != n) {
+                                    sum += s0[k1][r][n][t] * p[k1][r][n1][t] * exp(-d[k1][n1][r][n]);
+                                }
+                            }
+                        }
+                    }
+
+                    s[k][r][n] = prod / sum;
+                }
+            }
+        }
+
+        vector<vector<double>> s_cur(K, vector<double>(N));
+        for (int k = 0; k < K; k++) {
+            for (auto [weight, n]: kek) {
+                double prod = 1;
+                int count = 0;
+                for (int r = 0; r < R; r++) {
+                    if ((p[k][r][n][t] > 0 ? 1 : 0) == 1) {
+                        count++;
+                        prod *= s[k][r][n];
+                    }
+                }
+
+                s_cur[k][n] = std::pow(prod, 1.0 / count);
+            }
+        }
+
+        vector<int> need_delete;
+        for (auto &[n, data]: users) {
+            for (int k = 0; k < K; k++) {
+                for (int r = 0; r < R; r++) {
+                    data.g += 192 * (p[k][r][n][t] > 0 ? 1 : 0) * log2(1 + s_cur[k][n]);
+                }
+            }
+
+            // мы уже отправили все
+            if (data.g >= Queries[data.j].TBS) {
+                need_delete.push_back(n);
+            }
+        }
+        for (int n: need_delete) {
+            users.erase(n);
+        }
 
         // remove
         for (int j: event_remove[t]) {
