@@ -3,10 +3,14 @@
 using namespace std;
 
 int main() {
-    std::ifstream cin("input.txt");
+    //std::ifstream cin("input.txt");
     std::ios::sync_with_stdio(false);
     std::cin.tie(0);
     std::cout.tie(0);
+
+    // ===========
+    // ==READING==
+    // ===========
 
     int N;
     int K;
@@ -16,7 +20,6 @@ int main() {
 
     // s0[k][r][n][t]
     vector<vector<vector<vector<double>>>> s0(K, vector(R, vector(N, vector<double>(T))));
-
     for (int t = 0; t < T; t++) {
         for (int k = 0; k < K; k++) {
             for (int r = 0; r < R; r++) {
@@ -146,65 +149,56 @@ int main() {
         return g;
     };
 
-    // importance_of_power[n][t]
-    vector<vector<double>> importance_of_power(N, vector<double>(T));
+    // ============
+    // ==SOLUTION==
+    // ============
+
+    vector<vector<int>> event_add(T), event_remove(T);
     for (int j = 0; j < J; j++) {
-        int n = Queries[j].user_id;
-        int t0 = Queries[j].t0;
-        int t1 = Queries[j].t1;
-        double weight = 1.0 / ((t1 - t0 + 1) * 1LL * Queries[j].TBS);
-        for (int t = t0; t <= t1; t++) {
-            importance_of_power[n][t] += weight;
-        }
+        event_add[Queries[j].t0].push_back(j);
+        event_remove[Queries[j].t1].push_back(j);
     }
 
-    /*vector<pair<int, int>> segments;
-    for(int j = 0; j < J; j++){
+    struct data {
+        int j; // номер окна
+        double g; // TODO: calculate this
 
-    }*/
-
-    /*for (int k = 0; k < K; k++) {
-        for (int r = 0; r < R; r++) {
-            for (int n = 0; n < N; n++) {
-                for (int t = 0; t < T; t++) {
-                    if (importance_of_power[n][t] != 0) {
-                        p[k][r][n][t] = 4;
-                    }
-                }
-            }
-        }
-    }*/
-
-    auto kek = [&](double &sum, double &p, double expected) {
-        if (sum - p < expected) {
-            double diff = sum - expected;
-            p -= diff;
-            sum -= diff;
-        } else {
-            sum -= p;
-            p = 0;
-        }
+        double sum_p;
     };
 
+    map<int, data> users;
+
     for (int t = 0; t < T; t++) {
-        vector<pair<double, int>> data;
-        for (int n = 0; n < N; n++) {
-            if (importance_of_power[n][t] != 0) {
-                data.emplace_back(importance_of_power[n][t], n);
+        // add
+        for (int j: event_add[t]) {
+            int n = Queries[j].user_id;
+            if (users.contains(n)) {
+                exit(1);
             }
-        }
-        sort(data.begin(), data.end());
-
-        double sum_importance = 0;
-        for (int n = 0; n < N; n++) {
-            sum_importance += importance_of_power[n][t];
+            users[n] = {j, 0, 0};
         }
 
-        if (sum_importance != 0) {
+        // set power in time t
+        {
+            vector<pair<double, int>> kek;
+            for (auto [n, data]: users) {
+                auto [TBS, user_id, t0, t1] = Queries[data.j];
+                double weight = pow(t1 - t + 1, 4);
+                weight *= pow(TBS, 6);
+                weight = 1 / weight;
+                kek.emplace_back(weight, n);
+            }
+            sort(kek.begin(), kek.end());
+
+            double sum_weight = 0;
+            for (auto [weight, n]: kek) {
+                sum_weight += weight;
+            }
+
             for (int k = 0; k < K; k++) {
                 for (int r = 0; r < R; r++) {
-                    for (int n = 0; n < N; n++) {
-                        p[k][r][n][t] = importance_of_power[n][t] / sum_importance * 4;
+                    for (auto [weight, n]: kek) {
+                        p[k][r][n][t] = weight / sum_weight * 4;
                     }
                 }
             }
@@ -212,19 +206,31 @@ int main() {
             for (int k = 0; k < K; k++) {
                 double sum = 0;
                 for (int r = 0; r < R; r++) {
-                    for (int n = 0; n < N; n++) {
+                    for (auto [weight, n]: kek) {
                         sum += p[k][r][n][t];
                     }
                 }
 
                 for (int r = 0; r < R; r++) {
-                    for (int n = 0; n < N; n++) {
-                        p[k][r][n][t] *= min(1.0, (importance_of_power[n][t] / sum_importance) * (R / sum));
+                    for (auto [weight, n]: kek) {
+                        p[k][r][n][t] *= min(1.0, (weight / sum_weight) * (R / sum));
                     }
                 }
             }
         }
+
+
+
+        // remove
+        for (int j: event_remove[t]) {
+            int n = Queries[j].user_id;
+            users.erase(n);
+        }
     }
+
+    // ==========
+    // ==OUTPUT==
+    // ==========
 
     {
         /*for (int t = 0; t < T; t++) {
@@ -238,12 +244,12 @@ int main() {
             }
         }*/
 
-        auto g = build_g(build_s_knt(build_s_krnt()));
+        /*auto g = build_g(build_s_knt(build_s_krnt()));
 
         for (int j = 0; j < J; j++) {
             cout << g[j] << ' ' << Queries[j].TBS << ' ' << (g[j] >= Queries[j].TBS) << '\n';
         }
-        cout << '\n';
+        cout << '\n';*/
     }
 
     cout << fixed << setprecision(10);
