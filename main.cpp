@@ -3,7 +3,7 @@
 using namespace std;
 
 int main() {
-    //std::ifstream cin("input.txt");
+    // std::ifstream cin("input.txt");
     std::ios::sync_with_stdio(false);
     std::cin.tie(0);
     std::cout.tie(0);
@@ -86,6 +86,16 @@ int main() {
     // p[t][n][k][r]
     vector<vector<vector<vector<double>>>> p(T, vector(N, vector(K, vector<double>(R))));
 
+    /*for (int t = 0; t < T; t++) {
+        for (int k = 0; k < K; k++) {
+            for (int r = 0; r < R; r++) {
+                for (int n = 0; n < N; n++) {
+                    cin >> p[t][n][k][r];
+                }
+            }
+        }
+    }*/
+
     // ============
     // ==SOLUTION==
     // ============
@@ -110,27 +120,73 @@ int main() {
             users[n] = {j, 0};
         }
 
+        // веса нужны от [0, 1]
+        // сумма весов должна быть 1
         vector<pair<double, int>> kek;
-        for (auto [n, data]: users) {
-            auto [TBS, user_id, t0, t1] = Queries[data.j];
-            double weight = pow(t1 - t + 1, 4);
-            weight *= pow(TBS - data.g, 6);
-            weight = 1 / weight;
-            kek.emplace_back(weight, n);
-        }
-        sort(kek.begin(), kek.end());
-
-        // set power in time t
         {
+            for (auto [n, data]: users) {
+                auto [TBS, user_id, t0, t1] = Queries[data.j];
+
+                double weight = pow(t1 - t + 1, 4);
+                weight *= pow(TBS - data.g, 6);
+                weight = 1 / weight;
+
+                kek.emplace_back(weight, n);
+            }
+
+            // normalize weights
+
+            double min_weight = 0;
+            for (auto [weight, n]: kek) {
+                min_weight = min(min_weight, weight);
+            }
+            for (auto &[weight, n]: kek) {
+                weight -= min_weight;
+            }
+
             double sum_weight = 0;
             for (auto [weight, n]: kek) {
                 sum_weight += weight;
             }
+            if (sum_weight == 0) {
+                sum_weight = kek.size();
+                for (auto &[weight, n]: kek) {
+                    weight = 1;
+                }
+            }
+            for (auto &[weight, n]: kek) {
+                weight = weight / sum_weight;
+            }
 
+            //cout << "weights: ";
+            //for (auto &[weight, n]: kek) {
+            //    cout << weight << ' ';
+            //}
+            //cout << '\n';
+
+            sort(kek.begin(), kek.end());
+
+            // verify
+            {
+                double sum_weight = 0;
+                for (auto [weight, n]: kek) {
+                    sum_weight += weight;
+                    if (weight + 1e-9 < 0 || weight - 1e-9 > 1) {
+                        exit(1);
+                    }
+                }
+                if (!kek.empty() && abs(sum_weight - 1) > 1e-9) {
+                    exit(1);
+                }
+            }
+        }
+
+        // set power in time t
+        {
             for (auto [weight, n]: kek) {
                 for (int k = 0; k < K; k++) {
                     for (int r = 0; r < R; r++) {
-                        p[t][n][k][r] = weight / sum_weight * 4;
+                        p[t][n][k][r] = weight * 4;
                     }
                 }
             }
@@ -145,7 +201,7 @@ int main() {
 
                 for (auto [weight, n]: kek) {
                     for (int r = 0; r < R; r++) {
-                        p[t][n][k][r] *= min(1.0, (weight / sum_weight) * (R / sum));
+                        p[t][n][k][r] *= min(1.0, R / sum);
                     }
                 }
             }
@@ -214,6 +270,8 @@ int main() {
             if (data.g >= Queries[data.j].TBS) {
                 need_delete.push_back(n);
             }
+
+            //cout << "hi: " << n << ' ' << data.g << '\n';
         }
         for (int n: need_delete) {
             users.erase(n);
