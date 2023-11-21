@@ -456,8 +456,8 @@ int main() {
         }
 
         // TODO: update other users
-
-        vector<int> need_delete;
+        // почему-то это только ухудшает
+        /*vector<int> need_delete;
         for (auto &[m, data2]: users) {
             for (int time = Queries[j].t0; time <= t1; time++) {
                 data2.g -= add_g[time][m];
@@ -470,7 +470,7 @@ int main() {
         }
         for (int n: need_delete) {
             users.erase(n);
-        }
+        }*/
     };
 
     for (int t = 0; t < T; t++) {
@@ -581,8 +581,9 @@ int main() {
             }
         }
         for (int n: need_delete) {
-            do_smaller(t, users[n].j);
+            int j = users[n].j;
             users.erase(n);
+            do_smaller(t, j);
         }
 
         // remove
@@ -624,8 +625,9 @@ int main() {
                 }
             }
             for (int n: need_delete) {
-                do_smaller(t, users[n].j);
+                int j = users[n].j;
                 users.erase(n);
+                do_smaller(t, j);
             }
         }
     }
