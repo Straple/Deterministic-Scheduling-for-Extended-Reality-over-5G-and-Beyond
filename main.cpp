@@ -132,7 +132,9 @@ int main() {
         vector<double> g(J);
         for (int j = 0; j < J; j++) {
             int n = Queries[j].user_id;
-            for (int t = Queries[j].t0; t <= Queries[j].t1; t++) {
+            int t0 = Queries[j].t0;
+            int t1 = Queries[j].t1;
+            for (int t = t0; t <= t1; t++) {
                 for (int k = 0; k < K; k++) {
                     for (int r = 0; r < R; r++) {
                         g[j] += (p[k][r][n][t] > 0 ? 1 : 0) * log2(1 + s[k][n][t]);
@@ -144,32 +146,112 @@ int main() {
         return g;
     };
 
+    // importance_of_power[n][t]
+    vector<vector<double>> importance_of_power(N, vector<double>(T));
+    for (int j = 0; j < J; j++) {
+        int n = Queries[j].user_id;
+        int t0 = Queries[j].t0;
+        int t1 = Queries[j].t1;
+        double weight = 1.0 / ((t1 - t0 + 1) * 1LL * Queries[j].TBS);
+        for (int t = t0; t <= t1; t++) {
+            importance_of_power[n][t] += weight;
+        }
+    }
+
+    /*vector<pair<int, int>> segments;
+    for(int j = 0; j < J; j++){
+
+    }*/
+
+    /*for (int k = 0; k < K; k++) {
+        for (int r = 0; r < R; r++) {
+            for (int n = 0; n < N; n++) {
+                for (int t = 0; t < T; t++) {
+                    if (importance_of_power[n][t] != 0) {
+                        p[k][r][n][t] = 4;
+                    }
+                }
+            }
+        }
+    }*/
+
+    auto kek = [&](double &sum, double &p, double expected) {
+        if (sum - p < expected) {
+            double diff = sum - expected;
+            p -= diff;
+            sum -= diff;
+        } else {
+            sum -= p;
+            p = 0;
+        }
+    };
+
     for (int t = 0; t < T; t++) {
-        for (int k = 0; k < K; k++) {
-            for (int r = 0; r < R; r++) {
-                for (int n = 0; n < N; n++) {
-                    cin >> p[k][r][n][t];
+        vector<pair<double, int>> data;
+        for (int n = 0; n < N; n++) {
+            if (importance_of_power[n][t] != 0) {
+                data.emplace_back(importance_of_power[n][t], n);
+            }
+        }
+        sort(data.begin(), data.end());
+
+        double sum_importance = 0;
+        for (int n = 0; n < N; n++) {
+            sum_importance += importance_of_power[n][t];
+        }
+
+        if (sum_importance != 0) {
+            for (int k = 0; k < K; k++) {
+                for (int r = 0; r < R; r++) {
+                    for (int n = 0; n < N; n++) {
+                        p[k][r][n][t] = importance_of_power[n][t] / sum_importance * 4;
+                    }
+                }
+            }
+
+            for (int k = 0; k < K; k++) {
+                double sum = 0;
+                for (int r = 0; r < R; r++) {
+                    for (int n = 0; n < N; n++) {
+                        sum += p[k][r][n][t];
+                    }
+                }
+
+                for (int r = 0; r < R; r++) {
+                    for (int n = 0; n < N; n++) {
+                        p[k][r][n][t] *= min(1.0, (importance_of_power[n][t] / sum_importance) * (R / sum));
+                    }
                 }
             }
         }
     }
 
-    auto g = build_g(build_s_knt(build_s_krnt()));
+    {
+        /*for (int t = 0; t < T; t++) {
+            for (int k = 0; k < K; k++) {
+                for (int r = 0; r < R; r++) {
+                    for (int n = 0; n < N; n++) {
 
-    for (int j = 0; j < J; j++) {
-        cout << g[j] << ' ' << Queries[j].TBS << ' ' << (g[j] >= Queries[j].TBS) << '\n';
+                        cin >> p[k][r][n][t];
+                    }
+                }
+            }
+        }*/
+
+        auto g = build_g(build_s_knt(build_s_krnt()));
+
+        for (int j = 0; j < J; j++) {
+            cout << g[j] << ' ' << Queries[j].TBS << ' ' << (g[j] >= Queries[j].TBS) << '\n';
+        }
+        cout << '\n';
     }
-    cout << '\n';
 
     cout << fixed << setprecision(10);
     for (int t = 0; t < T; t++) {
         for (int k = 0; k < K; k++) {
             for (int r = 0; r < R; r++) {
                 for (int n = 0; n < N; n++) {
-                    if (n != 0) {
-                        cout << ' ';
-                    }
-                    cout << p[k][r][n][t];
+                    cout << p[k][r][n][t] << ' ';
                 }
                 cout << '\n';
             }
