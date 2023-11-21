@@ -2,6 +2,9 @@
 
 using namespace std;
 
+//#define VERIFY_G
+//#define READ_POWER
+
 int main() {
     //std::ifstream cin("input.txt");
     std::ios::sync_with_stdio(false);
@@ -74,7 +77,8 @@ int main() {
     // p[t][n][k][r]
     vector<vector<vector<vector<double>>>> p(T, vector(N, vector(K, vector<double>(R))));
 
-    /*for (int t = 0; t < T; t++) {
+#ifdef READ_POWER
+    for (int t = 0; t < T; t++) {
         for (int k = 0; k < K; k++) {
             for (int r = 0; r < R; r++) {
                 for (int n = 0; n < N; n++) {
@@ -82,7 +86,8 @@ int main() {
                 }
             }
         }
-    }*/
+    }
+#endif
 
     // ============
     // ==SOLUTION==
@@ -99,8 +104,64 @@ int main() {
         double g;
     };
 
-    map<int, data> users;
 
+    auto calc_g = [&](int t, int n) { // NOLINT
+        // dp_sum_noeq[k][r]
+        vector<vector<double>> dp_sum_noeq(K, vector<double>(R, 1));
+        // dp_sum[k][r]
+        vector<vector<double>> dp_sum(K, vector<double>(R));
+        {
+            for (int m = 0; m < N; m++) {
+                if (m != n) {
+                    for (int k = 0; k < K; k++) {
+                        for (int r = 0; r < R; r++) {
+                            dp_sum[k][r] += s0[t][n][k][r] * p[t][m][k][r] / exp_d[n][m][k][r];
+                        }
+                    }
+                }
+            }
+
+            for (int k = 0; k < K; k++) {
+                for (int k1 = 0; k1 < K; k1++) {
+                    if (k != k1) {
+                        for (int r = 0; r < R; r++) {
+                            dp_sum_noeq[k][r] += dp_sum[k1][r];
+                        }
+                    }
+                }
+            }
+        }
+
+        double sum = 0;
+        for (int k = 0; k < K; k++) {
+
+            double accum_prod = 1;
+            int count = 0;
+            for (int r = 0; r < R; r++) {
+                if (p[t][n][k][r] > 0) {
+                    count++;
+                    accum_prod *= p[t][n][k][r];
+                    accum_prod *= s0[t][n][k][r];
+                    accum_prod /= dp_sum_noeq[k][r];
+
+                    for (int m = 0; m < N; m++) {
+                        if (n != m) {
+                            if (p[t][m][k][r] > 0) {
+                                accum_prod *= exp_d[n][m][k][r];
+                            }
+                        }
+                    }
+                }
+            }
+
+            sum += count * log2(1 + std::pow(accum_prod, 1.0 / count));
+        }
+        return 192 * sum;
+    };
+
+    vector<vector<double>> add_g(T, vector<double>(N));
+
+    map<int, data> users;
     for (int t = 0; t < T; t++) {
         // add
         for (int j: event_add[t]) {
@@ -115,7 +176,6 @@ int main() {
             for (auto [n, data]: users) {
                 auto [TBS, user_id, t0, t1] = Queries[data.j];
 
-                // 8669
                 double weight = 1;
                 weight *= exp(pow(TBS - data.g, 0.58));
                 weight /= exp(pow((t1 - t0 + 1) * 1.0 / (t1 - t + 1), 2.1));
@@ -202,55 +262,8 @@ int main() {
         vector<int> need_delete;
         for (auto &[n, data]: users) {
 
-            // dp_sum_noeq[k][r]
-            vector<vector<double>> dp_sum_noeq(K, vector<double>(R, 1));
-            // dp_sum[k][r]
-            vector<vector<double>> dp_sum(K, vector<double>(R));
-            {
-                for (auto [m, data]: users) {
-                    if (m != n) {
-                        for (int k = 0; k < K; k++) {
-                            for (int r = 0; r < R; r++) {
-                                dp_sum[k][r] += s0[t][n][k][r] * p[t][m][k][r] / exp_d[n][m][k][r];
-                            }
-                        }
-                    }
-                }
-
-                for (int k = 0; k < K; k++) {
-                    for (int k1 = 0; k1 < K; k1++) {
-                        if (k != k1) {
-                            for (int r = 0; r < R; r++) {
-                                dp_sum_noeq[k][r] += dp_sum[k1][r];
-                            }
-                        }
-                    }
-                }
-            }
-
-            double sum = 0;
-            for (int k = 0; k < K; k++) {
-
-                double accum_prod = 1;
-                int count = 0;
-                for (int r = 0; r < R; r++) {
-                    if (p[t][n][k][r] > 0) {
-                        count++;
-                        accum_prod *= p[t][n][k][r];
-                        accum_prod *= s0[t][n][k][r];
-                        accum_prod /= dp_sum_noeq[k][r];
-
-                        for (int m = 0; m < N; m++) {
-                            if (n != m) {
-                                accum_prod *= exp(d[n][m][k][r] * (p[t][m][k][r] > 0 ? 1 : 0));
-                            }
-                        }
-                    }
-                }
-
-                sum += count * log2(1 + std::pow(accum_prod, 1.0 / count));
-            }
-            data.g += 192 * sum;
+            add_g[t][n] = calc_g(t, n);
+            data.g += add_g[t][n];
 
             // мы уже отправили все
             if (data.g >= Queries[data.j].TBS) {
@@ -266,9 +279,122 @@ int main() {
         // remove
         for (int j: event_remove[t]) {
             int n = Queries[j].user_id;
-            users.erase(n);
+            if (users.contains(n)) {
+
+                // TODO: если мы не смогли набрать TBS, то нам не нужно было тратить туда силу
+                for (int t = Queries[j].t0; t <= Queries[j].t1; t++) {
+                    for (int k = 0; k < K; k++) {
+                        for (int r = 0; r < R; r++) {
+                            p[t][n][k][r] = 0;
+                        }
+                    }
+                }
+                users.erase(n);
+
+                vector<int> need_delete;
+                for (auto &[m, data2]: users) {
+                    for (int time = Queries[j].t0; time <= t; time++) {
+                        data2.g -= add_g[time][m];
+                        add_g[time][m] = calc_g(time, m);
+                        data2.g += add_g[time][m];
+                    }
+                    if (data2.g >= Queries[data2.j].TBS) {
+                        need_delete.push_back(m);
+                    }
+                }
+                for (int n: need_delete) {
+                    users.erase(n);
+                }
+            }
         }
     }
+
+#ifdef VERIFY_G
+    {
+        // NOLINTNEXTLINE
+        auto build_s_krnt = [&]() {
+            // s[k][r][n][t]
+            vector<vector<vector<vector<double>>>> s(K, vector(R, vector(N, vector<double>(T))));
+
+            for (int k = 0; k < K; k++) {
+                for (int r = 0; r < R; r++) {
+                    for (int n = 0; n < N; n++) {
+                        for (int t = 0; t < T; t++) {
+
+                            double prod = 1;
+                            for (int m = 0; m < N; m++) {
+                                if (m != n) {
+                                    prod *= exp(d[n][m][k][r] * (p[t][m][k][r] > 0 ? 1 : 0));
+                                }
+                            }
+                            prod *= p[t][n][k][r];
+                            prod *= s0[t][n][k][r];
+
+                            double sum = 1;
+                            for (int k1 = 0; k1 < K; k1++) {
+                                if (k1 != k) {
+                                    for (int n1 = 0; n1 < N; n1++) {
+                                        if (n1 != n) {
+                                            sum += s0[t][n][k1][r] * p[t][n1][k1][r] * exp(-d[n][n1][k1][r]);
+                                        }
+                                    }
+                                }
+                            }
+
+                            s[k][r][n][t] = prod / sum;
+                        }
+                    }
+                }
+            }
+            return s;
+        };
+
+        auto build_s_knt = [&](vector<vector<vector<vector<double>>>> s) {
+            vector<vector<vector<double>>> s_cur(K, vector(N, vector<double>(T)));
+            for (int k = 0; k < K; k++) {
+                for (int n = 0; n < N; n++) {
+                    for (int t = 0; t < T; t++) {
+                        double prod = 1;
+                        int count = 0;
+                        for (int r = 0; r < R; r++) {
+                            if (p[t][n][k][r] > 0) {
+                                count++;
+                                prod *= s[k][r][n][t];
+                            }
+                        }
+
+                        s_cur[k][n][t] = std::pow(prod, 1.0 / count);
+                    }
+                }
+            }
+            return s_cur;
+        };
+
+        auto build_g = [&](vector<vector<vector<double>>> s) {
+            vector<double> g(J);
+            for (int j = 0; j < J; j++) {
+                int n = Queries[j].user_id;
+                for (int t = Queries[j].t0; t <= Queries[j].t1; t++) {
+                    for (int k = 0; k < K; k++) {
+                        for (int r = 0; r < R; r++) {
+                            g[j] += (p[t][n][k][r] > 0 ? 1 : 0) * log2(1 + s[k][n][t]);
+                        }
+                    }
+                }
+                g[j] *= 192;
+            }
+            return g;
+        };
+
+        auto correct_g_maybe = build_g(build_s_knt(build_s_krnt()));
+        double error = 0;
+        for (int j = 0; j < J; j++) {
+            cout << correct_g_maybe[j] << '\n';
+        }
+        //cout << '\n';
+        //cout << "error: " << error << '\n';
+    }
+#endif
 
     // ==========
     // ==OUTPUT==
