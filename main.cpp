@@ -3,7 +3,7 @@
 using namespace std;
 
 int main() {
-    // std::ifstream cin("input.txt");
+    //std::ifstream cin("input.txt");
     std::ios::sync_with_stdio(false);
     std::cin.tie(0);
     std::cout.tie(0);
@@ -30,28 +30,16 @@ int main() {
         }
     }
 
+    vector<vector<vector<vector<double>>>> d(N, vector(N, vector(K, vector<double>(R))));
+
     // exp_d[n][m][k][r]
     vector<vector<vector<vector<double>>>> exp_d(N, vector(N, vector(K, vector<double>(R))));
     for (int k = 0; k < K; k++) {
         for (int r = 0; r < R; r++) {
             for (int m = 0; m < N; m++) {
                 for (int n = 0; n < N; n++) {
-                    cin >> exp_d[n][m][k][r];
-                    exp_d[n][m][k][r] = exp(exp_d[n][m][k][r]);
-                }
-            }
-        }
-    }
-
-    // product_exp_d[n][r][k]
-    vector<vector<vector<double>>> product_exp_d(N, vector(K, vector<double>(R, 1)));
-    for (int n = 0; n < N; n++) {
-        for (int m = 0; m < N; m++) {
-            if (m != n) {
-                for (int k = 0; k < K; k++) {
-                    for (int r = 0; r < R; r++) {
-                        product_exp_d[n][k][r] *= exp_d[n][m][k][r];
-                    }
+                    cin >> d[n][m][k][r];
+                    exp_d[n][m][k][r] = exp(d[n][m][k][r]);
                 }
             }
         }
@@ -127,8 +115,10 @@ int main() {
             for (auto [n, data]: users) {
                 auto [TBS, user_id, t0, t1] = Queries[data.j];
 
-                double weight = pow(t1 - t + 1, 4);
-                weight *= pow(TBS - data.g, 6);
+                // 8669
+                double weight = 1;
+                weight *= exp(pow(TBS - data.g, 0.58));
+                weight /= exp(pow((t1 - t0 + 1) * 1.0 / (t1 - t + 1), 2.1));
                 weight = 1 / weight;
 
                 kek.emplace_back(weight, n);
@@ -246,19 +236,15 @@ int main() {
                 for (int r = 0; r < R; r++) {
                     if (p[t][n][k][r] > 0) {
                         count++;
-
                         accum_prod *= p[t][n][k][r];
                         accum_prod *= s0[t][n][k][r];
-                        accum_prod *= product_exp_d[n][k][r];
                         accum_prod /= dp_sum_noeq[k][r];
 
-                        // kek: 11.2449
-                        // kek: 11.2449
-                        // kek: 1
-                        // kek: 1
-                        // kek: 1
-                        // kek: 1
-                        // cout << "kek: " << dp_sum_noeq[k][r] << '\n';
+                        for (int m = 0; m < N; m++) {
+                            if (n != m) {
+                                accum_prod *= exp(d[n][m][k][r] * (p[t][m][k][r] > 0 ? 1 : 0));
+                            }
+                        }
                     }
                 }
 
