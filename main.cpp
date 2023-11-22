@@ -521,8 +521,8 @@ int main() {
                     for (int k = 0; k < K; k++) {
                         for (int r = 0; r < R; r++) {
                             double weight = 1;
-                            weight *= exp(pow((t1 - t0 + 1) * 1.0 / (t1 - t + 1), 2.1));
-                            weight /= exp(pow(TBS - data.g, 0.6));
+                            //weight *= exp(pow((t1 - t0 + 1) * 1.0 / (t1 - t + 1), 2.1));
+                            weight /= exp(pow(TBS - data.g, 0.5)); // 10'333
 
                             for (auto [m, data2]: users) {
                                 if (n != m) {
@@ -808,8 +808,6 @@ int main() {
     }
     cout << '\n';
     cout << ans_count << '\n';*/
-
-
 
     // ==========
     // ==OUTPUT==
