@@ -239,10 +239,12 @@ bool is_spoiled(double num) {
 
 using namespace std::chrono;
 
-#define FAST_STREAM
+//#define FAST_STREAM
 
 int main() {
-    // std::ifstream cin("input.txt");
+#ifndef FAST_STREAM
+    std::ifstream cin("input.txt");
+#endif
     std::ios::sync_with_stdio(false);
     std::cin.tie(0);
     std::cout.tie(0);
@@ -286,6 +288,9 @@ int main() {
 
     // exp_d[n][m][k][r]
     vector<vector<vector<vector<double>>>> exp_d(N, vector(N, vector(K, vector<double>(R))));
+
+    // exp_d_pow[n][m][k][r]
+    vector<vector<vector<vector<double>>>> exp_d_pow(N, vector(N, vector(K, vector<double>(R))));
     for (int k = 0; k < K; k++) {
         for (int r = 0; r < R; r++) {
             for (int m = 0; m < N; m++) {
@@ -296,6 +301,8 @@ int main() {
                     cin >> d[n][m][k][r];
 #endif
                     exp_d[n][m][k][r] = exp(d[n][m][k][r]);
+
+                    exp_d_pow[n][m][k][r] = pow(exp_d[n][m][k][r], 3);
                 }
             }
         }
@@ -346,12 +353,14 @@ int main() {
     // ==SOLUTION==
     // ============
 
+    // dp_s0_p_d[t][n][k][r]
+    vector<vector<vector<vector<double>>>> dp_s0_p_d(T, vector(N, vector(K, vector<double>(R))));
+
     auto calc_g = [&](int t, int n) {  // NOLINT
-        // dp_sum_noeq[k][r]
-        vector<vector<double>> dp_sum_noeq(K, vector<double>(R, 1));
-        // dp_sum[k][r]
-        vector<vector<double>> dp_sum(K, vector<double>(R));
+        // update dp_s0_p_d
         {
+            // dp_sum[k][r]
+            vector<vector<double>> dp_sum(K, vector<double>(R));
             for (int m = 0; m < N; m++) {
                 if (m != n) {
                     for (int k = 0; k < K; k++) {
@@ -362,13 +371,16 @@ int main() {
                 }
             }
 
+            vector<double> dp_sum_2(R);
             for (int k = 0; k < K; k++) {
-                for (int k1 = 0; k1 < K; k1++) {
-                    if (k != k1) {
-                        for (int r = 0; r < R; r++) {
-                            dp_sum_noeq[k][r] += dp_sum[k1][r];
-                        }
-                    }
+                for (int r = 0; r < R; r++) {
+                    dp_sum_2[r] += dp_sum[k][r];
+                }
+            }
+
+            for (int k = 0; k < K; k++) {
+                for (int r = 0; r < R; r++) {
+                    dp_s0_p_d[t][n][k][r] = 1 + dp_sum_2[r] - dp_sum[k][r];
                 }
             }
         }
@@ -382,7 +394,7 @@ int main() {
                     count++;
                     accum_prod *= p[t][n][k][r];
                     accum_prod *= s0[t][n][k][r];
-                    accum_prod /= dp_sum_noeq[k][r];
+                    accum_prod /= dp_s0_p_d[t][n][k][r];
 
                     for (int m = 0; m < N; m++) {
                         if (n != m) {
@@ -394,7 +406,7 @@ int main() {
                 }
             }
 
-            sum += count * log2(1 + std::pow(accum_prod, 1.0 / count));
+            sum += count * log2(1 + pow(accum_prod, 1.0 / count));
         }
         if (sum < 0 || is_spoiled(sum)) {
             while (true) {}
@@ -432,8 +444,7 @@ int main() {
 
         auto do_smaller = [&](int t, int j, double received_TBS) {  // NOLINT
             auto [TBS, n, t0, _] = Queries[j];
-            // максимально сильно уменьшим применяемую силу, но так, чтобы все
-            // еще получали TBS
+            // максимально сильно уменьшим применяемую силу, но так, чтобы все еще получали TBS
             auto calc_TBS = [&](double power_factor) {
                 vector<vector<double>> save_p(K, vector<double>(R));
                 for (int k = 0; k < K; k++) {
@@ -521,16 +532,22 @@ int main() {
                     for (int k = 0; k < K; k++) {
                         for (int r = 0; r < R; r++) {
                             double weight = 1;
-                            weight *= exp(pow((t1 - t0 + 1) * 1.0 / (t1 - t + 1), 2.1));
-                            weight /= exp(pow(TBS - data.g, 0.5));
+                            weight *= exp(pow((t1 - t0 + 1) * 1.0 / (t1 - t + 1), 2.1) - pow(TBS - data.g, 0.5));
+
+                            //weight *= s0[t][n][k][r];
 
                             for (auto [m, data2]: users) {
                                 if (n != m) {
-                                    //weight /= pow(exp_d[m][n][k][r], 3);
-
-                                    weight *= pow(exp_d[n][m][k][r], 3);
+                                    weight *= exp_d_pow[n][m][k][r];
                                 }
                             }
+
+                            /*weight += 100;
+                            for (int k2 = 0; k2 < K; k2++) {
+                                if (k != k2) {
+                                    weight -= pow(s0[t][n][k2][r], 0.5);
+                                }
+                            }*/
 
                             kek.emplace_back(weight, n, k, r);
 
@@ -665,7 +682,7 @@ int main() {
             }
 
             // trivial remove
-            /*for (int j : event_remove[t]) {
+            /*for (int j: event_remove[t]) {
                 int n = Queries[j].user_id;
                 if (users.contains(n)) {
                     total_g[j] = users[n].g;
@@ -701,6 +718,10 @@ int main() {
                     }
                 }
 
+                // TODO: попробовать перераспределить силу, которую я убрал
+                // возможно лучшим способом будет сказать, что weight_factor[j] = 0
+                // а под конец пересчитать так еще раз
+
                 vector<pair<double, int>> need_delete;
                 for (auto &[m, data2]: users) {
                     for (int time = max(Queries[data2.j].t0, Queries[j].t0); time <= t; time++) {
@@ -730,22 +751,91 @@ int main() {
     auto ans_power = p;
     int ans_count = 0;
 
-    for (int step = 0;; step++) {
+    // 1 раз solution 10586.882 points
+    // 1 секунду solution 11828.898 points с адаптивным weight
+
+    auto f = [&](const vector<double> &total_g) {
+        double power_sum = 0;
+        for (int t = 0; t < T; t++) {
+            for (int n = 0; n < N; n++) {
+                for (int k = 0; k < K; k++) {
+                    for (int r = 0; r < R; r++) {
+                        power_sum += p[t][n][k][r];
+                    }
+                }
+            }
+        }
+        int X = 0;
+        for (int j = 0; j < J; j++) {
+            X += total_g[j] >= Queries[j].TBS;
+        }
+        return X - 1e-6 * power_sum;
+    };
+
+    // set nice weight_factor
+    {
+        for (int j = 0; j < J; j++) {
+            auto [TBS, n, t0, t1] = Queries[j];
+            weight_factor[j] = 1.0 / TBS * (t1 - t0 + 1);
+        }
+
+        // normalize
+        {
+
+            double min_weight = 0;
+            for (int j = 0; j < J; j++) {
+                min_weight = min(min_weight, weight_factor[j]);
+            }
+            if (min_weight < 0) {
+                for (int j = 0; j < J; j++) {
+                    weight_factor[j] -= min_weight;
+                }
+            }
+
+            double sum_weight = 0;
+            for (int j = 0; j < J; j++) {
+                sum_weight += weight_factor[j];
+            }
+            for (int j = 0; j < J; j++) {
+                weight_factor[j] /= sum_weight;
+            }
+            sum_weight = 0;
+            for (int j = 0; j < J; j++) {
+                sum_weight += weight_factor[j];
+            }
+            if (abs(sum_weight - 1) > 1e-9) {
+                cout << "fatal: " << sum_weight << '\n';
+                exit(1);
+            }
+        }
+    }
+
+    for (int step = 0; ; step++) {
         /*static mt19937 rnd(42);
         if (step % 50 == 0) {
             for (int j = 0; j < J; j++) {
                 weight_factor[j] *= 1 + (int(rnd()) * 1.0 / INT_MAX) / 10;
             }
         }*/
-        auto time_stop = steady_clock::now();
+        /*auto time_stop = steady_clock::now();
         auto duration = time_stop - time_start;
         double time = duration_cast<nanoseconds>(duration).count() / 1e9;
 
-        if (time > 1) {
+        if (time > 1.6) {
             break;
-        }
+        }*/
 
         auto total_g = solution(weight_factor);
+
+        cout << "score: " << f(total_g) << ' ' << J << endl;
+        /*{
+            auto x = weight_factor;
+            sort(x.begin(), x.end(), greater<>());
+            for (int j = 0; j < J; j++) {
+                cout << x[j] << ' ';
+            }
+            cout << '\n';
+        }*/
 
         // update best
         {
@@ -764,45 +854,69 @@ int main() {
             // посмотрим на те, которые нам не удалось передать
             // возможно им стоило уделить больше внимания: повысить
             // weight_factor возможно меньше: понизить
-
-            for (int j = 0; j < J; j++) {
-                auto [TBS, n, t0, t1] = Queries[j];
-                if (total_g[j] < 0) {
-                    exit(1);
-                }
-                if (total_g[j] < TBS) {
-                    // не дожали
-                    // повысим weight_factor?
-                    weight_factor[j] *= TBS / max(TBS / 3.0, total_g[j]);
-                    // weight_factor[j] += 2;
-                } else if (total_g[j] > TBS) {
-                    weight_factor[j] *= TBS / total_g[j];
-                }
-            }
-
-            /*double min_weight = 0;
-            for (int j = 0; j < J; j++) {
-                min_weight = min(min_weight, weight_factor[j]);
-            }
-            if (min_weight < 0) {
+            /*{
                 for (int j = 0; j < J; j++) {
-                    weight_factor[j] -= min_weight;
+                    auto [TBS, n, t0, t1] = Queries[j];
+                    if (total_g[j] < 0) {
+                        exit(1);
+                    }
+                    if (total_g[j] < TBS) {
+                        weight_factor[j] += TBS / max(TBS / 3.0, total_g[j]);
+                    } else if (total_g[j] > TBS) {
+                        weight_factor[j] += total_g[j] / TBS;
+                    }
                 }
             }*/
 
-            double sum_weight = 0;
-            for (int j = 0; j < J; j++) {
-                sum_weight += weight_factor[j];
+            if(step % 10 == 0) {
+                cout << "NEW\n";
+                static mt19937 rnd(42);
+                for (int j = 0; j < J; j++) {
+                    weight_factor[j] += (int(rnd()) * 1.0 / INT_MAX) / 10;
+                }
             }
-            for (int j = 0; j < J; j++) {
-                weight_factor[j] /= sum_weight;
+            else{
+                for(int j = 0; j < J; j++){
+                    auto [TBS, n, t0, t1] = Queries[j];
+                    if(total_g[j] < TBS){
+                        // зря мы сюда вкладывали силу
+                        weight_factor[j] = 0;
+                    }
+                }
             }
-            /*for (int j = 0; j < J; j++) {
-                cout << weight_factor[j] << ' ';
+            // normalize
+            {
+
+                double min_weight = 0;
+                for (int j = 0; j < J; j++) {
+                    min_weight = min(min_weight, weight_factor[j]);
+                }
+                if (min_weight < 0) {
+                    for (int j = 0; j < J; j++) {
+                        weight_factor[j] -= min_weight;
+                    }
+                }
+
+                double sum_weight = 0;
+                for (int j = 0; j < J; j++) {
+                    sum_weight += weight_factor[j];
+                }
+                for (int j = 0; j < J; j++) {
+                    weight_factor[j] /= sum_weight;
+                }
+                sum_weight = 0;
+                for (int j = 0; j < J; j++) {
+                    sum_weight += weight_factor[j];
+                }
+                if (abs(sum_weight - 1) > 1e-9) {
+                    cout << "fatal: " << sum_weight << '\n';
+                    exit(1);
+                }
             }
-            cout << '\n';*/
         }
     }
+
+    return 0;
 
     /*for (int j = 0; j < J; j++) {
         cout << weight_factor[j] << ' ';
