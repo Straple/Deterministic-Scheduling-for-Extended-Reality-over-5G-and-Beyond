@@ -223,10 +223,14 @@ inline void writeDouble(double x, int output_len) {
     writeChar('0' + t);
 }
 
-//#define FAST_STREAM
+bool is_spoiled(double num) {
+    return std::isnan(num) || std::isinf(num);
+}
+
+#define FAST_STREAM
 
 int main() {
-    std::ifstream cin("input.txt");
+    //std::ifstream cin("input.txt");
     std::ios::sync_with_stdio(false);
     std::cin.tie(0);
     std::cout.tie(0);
@@ -467,41 +471,53 @@ int main() {
         }
 
         // веса нужны от [0, 1]
-        // сумма весов должна быть 1
-        vector<pair<double, int>> kek;
+        // сумма весов при заданных k, r должна быть равна 1
+        vector<tuple<double, int, int, int>> kek;
         {
             for (auto [n, data]: users) {
                 auto [TBS, user_id, t0, t1] = Queries[data.j];
 
-                double weight = 1;
-                weight *= exp(pow((t1 - t0 + 1) * 1.0 / (t1 - t + 1), 2.1));
-                weight /= exp(pow(TBS - data.g, 0.58));
+                for (int k = 0; k < K; k++) {
+                    for (int r = 0; r < R; r++) {
+                        double weight = 1;
+                        weight *= exp(pow((t1 - t0 + 1) * 1.0 / (t1 - t + 1), 2.1));
+                        weight /= exp(pow(TBS - data.g, 0.6));
 
-                kek.emplace_back(weight, n);
+                        kek.emplace_back(weight, n, k, r);
+
+                        if (is_spoiled(weight)) {
+                            return 0;
+                        }
+                    }
+                }
             }
 
             // normalize weights
 
-            double min_weight = 0;
-            for (auto [weight, n]: kek) {
-                min_weight = min(min_weight, weight);
-            }
-            for (auto &[weight, n]: kek) {
-                weight -= min_weight;
-            }
-
-            double sum_weight = 0;
-            for (auto [weight, n]: kek) {
-                sum_weight += weight;
-            }
-            if (sum_weight == 0) {
-                sum_weight = kek.size();
-                for (auto &[weight, n]: kek) {
-                    weight = 1;
+            // min
+            /*{
+                double min_weight = 1e300;
+                for (auto [weight, n, k, r]: kek) {
+                    min_weight = min(min_weight, weight);
                 }
-            }
-            for (auto &[weight, n]: kek) {
-                weight = weight / sum_weight;
+                for (auto &[weight, n, k, r]: kek) {
+                    weight -= min_weight;
+                }
+            }*/
+
+            // sum
+            {
+                vector<vector<double>> sum_weight(K, vector<double>(R));
+                for (auto [weight, n, k, r]: kek) {
+                    sum_weight[k][r] += weight;
+                }
+                for (auto &[weight, n, k, r]: kek) {
+                    if (sum_weight[k][r] != 0) {
+                        weight = weight / sum_weight[k][r];
+                    } else {
+                        weight = 0;
+                    }
+                }
             }
 
             //cout << "weights: ";
@@ -511,45 +527,61 @@ int main() {
             //cout << '\n';
 
             sort(kek.begin(), kek.end());
+            reverse(kek.begin(), kek.end());
+            while (kek.size() > 1 && get<0>(kek.back()) < 0.001) {
+                kek.pop_back();
+            }
+            reverse(kek.begin(), kek.end());
+
+
+            // sum
+            {
+                vector<vector<double>> sum_weight(K, vector<double>(R));
+                for (auto [weight, n, k, r]: kek) {
+                    sum_weight[k][r] += weight;
+                }
+                for (auto &[weight, n, k, r]: kek) {
+                    if (sum_weight[k][r] != 0) {
+                        weight = weight / sum_weight[k][r];
+                    } else {
+                        weight = 0;
+                    }
+                }
+            }
+
+            sort(kek.begin(), kek.end());
 
             // verify
             {
-                double sum_weight = 0;
-                for (auto [weight, n]: kek) {
-                    sum_weight += weight;
-                    if (weight + 1e-9 < 0 || weight - 1e-9 > 1) {
+                vector<vector<double>> sum_weight(K, vector<double>(R));
+                for (auto [weight, n, k, r]: kek) {
+                    sum_weight[k][r] += weight;
+                    if (weight < 0 || weight > 1) {
                         exit(1);
                     }
                 }
-                if (!kek.empty() && abs(sum_weight - 1) > 1e-9) {
-                    exit(1);
+                for (int k = 0; k < K; k++) {
+                    for (int r = 0; r < R; r++) {
+                        if (sum_weight[k][r] != 0 && abs(sum_weight[k][r] - 1) > 1e-9) {
+                            exit(1);
+                        }
+                    }
                 }
             }
         }
 
         // set power in time t
         {
-            for (auto [weight, n]: kek) {
-                for (int k = 0; k < K; k++) {
-                    for (int r = 0; r < R; r++) {
-                        p[t][n][k][r] = weight * 4;
-                    }
-                }
+            for (auto [weight, n, k, r]: kek) {
+                p[t][n][k][r] = weight * 4;
             }
 
-            for (int k = 0; k < K; k++) {
-                double sum = 0;
-                for (auto [weight, n]: kek) {
-                    for (int r = 0; r < R; r++) {
-                        sum += p[t][n][k][r];
-                    }
-                }
-
-                for (auto [weight, n]: kek) {
-                    for (int r = 0; r < R; r++) {
-                        p[t][n][k][r] *= min(1.0, R / sum);
-                    }
-                }
+            vector<double> sum(K);
+            for (auto [weight, n, k, r]: kek) {
+                sum[k] += p[t][n][k][r];
+            }
+            for (auto [weight, n, k, r]: kek) {
+                p[t][n][k][r] *= min(1.0, R / sum[k]);
             }
         }
 
