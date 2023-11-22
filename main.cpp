@@ -521,19 +521,20 @@ int main() {
                     for (int k = 0; k < K; k++) {
                         for (int r = 0; r < R; r++) {
                             double weight = 1;
-                            //weight *= exp(pow((t1 - t0 + 1) * 1.0 / (t1 - t + 1), 2.1));
-                            weight /= exp(pow(TBS - data.g, 0.5)); // 10'333
+                            weight *= exp(pow((t1 - t0 + 1) * 1.0 / (t1 - t + 1), 2.1));
+                            weight /= exp(pow(TBS - data.g, 0.5));
 
                             for (auto [m, data2]: users) {
                                 if (n != m) {
-                                    weight *= pow(exp_d[m][n][k][r], 1);
-                                    weight *= pow(exp_d[n][m][k][r], 2.5);
+                                    //weight /= pow(exp_d[m][n][k][r], 3);
+
+                                    weight *= pow(exp_d[n][m][k][r], 3);
                                 }
                             }
 
                             kek.emplace_back(weight, n, k, r);
 
-                            if (is_spoiled(weight)) {
+                            if (weight < 0 || is_spoiled(weight)) {
                                 exit(1);
                             }
                         }
