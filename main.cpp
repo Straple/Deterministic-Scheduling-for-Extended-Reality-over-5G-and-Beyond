@@ -435,7 +435,6 @@ int main() {
             // максимально сильно уменьшим применяемую силу, но так, чтобы все
             // еще получали TBS
             auto calc_TBS = [&](double power_factor) {
-                double cur_TBS = 0;
                 vector<vector<double>> save_p(K, vector<double>(R));
                 for (int k = 0; k < K; k++) {
                     for (int r = 0; r < R; r++) {
@@ -443,7 +442,7 @@ int main() {
                         p[t][n][k][r] *= power_factor;
                     }
                 }
-                cur_TBS = calc_g(t, n);
+                double cur_TBS = calc_g(t, n);
 
                 for (int k = 0; k < K; k++) {
                     for (int r = 0; r < R; r++) {
@@ -550,7 +549,7 @@ int main() {
                         sum_weight[k][r] += weight;
                     }
                     for (auto &[weight, n, k, r]: kek) {
-                        if (sum_weight[k][r] > 1e-9) {
+                        if (sum_weight[k][r] != 0) {
                             weight = weight / sum_weight[k][r];
                         } else {
                             weight = 0;
@@ -569,7 +568,7 @@ int main() {
                         sum_weight[k][r] += weight;
                     }
                     for (auto &[weight, n, k, r]: kek) {
-                        if (sum_weight[k][r] > 1e-9) {
+                        if (sum_weight[k][r] != 0) {
                             weight = weight / sum_weight[k][r];
                         } else {
                             weight = 0;
@@ -585,7 +584,7 @@ int main() {
 
                 sort(kek.begin(), kek.end());
                 reverse(kek.begin(), kek.end());
-                while (kek.size() > 1 && get<0>(kek.back()) < 0.001) {
+                while (kek.size() > 1 && get<0>(kek.back()) < 0.02) {
                     kek.pop_back();
                 }
                 reverse(kek.begin(), kek.end());
@@ -597,7 +596,7 @@ int main() {
                         sum_weight[k][r] += weight;
                     }
                     for (auto &[weight, n, k, r]: kek) {
-                        if (sum_weight[k][r] > 0) {
+                        if (sum_weight[k][r] != 0) {
                             weight = weight / sum_weight[k][r];
                         } else {
                             weight = 0;
@@ -665,7 +664,7 @@ int main() {
             }
 
             // trivial remove
-            /*for (int j: event_remove[t]) {
+            /*for (int j : event_remove[t]) {
                 int n = Queries[j].user_id;
                 if (users.contains(n)) {
                     total_g[j] = users[n].g;
