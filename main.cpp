@@ -8,26 +8,32 @@ using namespace std;
 
 #define VERSION "0.1.8"
 
+#include <algorithm>
 #include <cassert>
 #include <cstdio>
-#include <algorithm>
 
 /** Fast allocation */
 
 #ifdef FAST_ALLOCATOR_MEMORY
 int allocator_pos = 0;
-    char allocator_memory[(int)FAST_ALLOCATOR_MEMORY];
-    inline void * operator new (size_t n) {
-        // fprintf(stderr, "n=%ld\n", n);
-        char *res = allocator_memory + allocator_pos;
-        assert(n <= (size_t)((int)FAST_ALLOCATOR_MEMORY - allocator_pos));
-        allocator_pos += n;
-        return (void *)res;
-    }
-    inline void operator delete (void *) noexcept { }
-    inline void operator delete (void *, size_t) noexcept { }
-    //inline void * operator new [] (size_t) { assert(0); }
-    //inline void operator delete [] (void *) { assert(0); }
+char allocator_memory[(int)FAST_ALLOCATOR_MEMORY];
+
+inline void *operator new(size_t n) {
+    // fprintf(stderr, "n=%ld\n", n);
+    char *res = allocator_memory + allocator_pos;
+    assert(n <= (size_t)((int)FAST_ALLOCATOR_MEMORY - allocator_pos));
+    allocator_pos += n;
+    return (void *)res;
+}
+
+inline void operator delete(void *) noexcept {
+}
+
+inline void operator delete(void *, size_t) noexcept {
+}
+
+// inline void * operator new [] (size_t) { assert(0); }
+// inline void operator delete [] (void *) { assert(0); }
 #endif
 
 /** Fast input-output */
@@ -39,10 +45,10 @@ inline double readDouble();
 
 inline int readUInt();
 
-inline int readChar(); // first non-blank character
+inline int readChar();  // first non-blank character
 inline void readWord(char *s);
 
-inline bool readLine(char *s); // do not save '\n'
+inline bool readLine(char *s);  // do not save '\n'
 inline bool isEof();
 
 inline int getChar();
@@ -60,7 +66,8 @@ inline void writeChar(int x);
 
 inline void writeWord(const char *s);
 
-inline void writeDouble(double x, int len = 10); // works correct only for |x| < 2^{63}
+inline void
+writeDouble(double x, int len = 10);  // works correct only for |x| < 2^{63}
 inline void flush();
 
 static struct buffer_flusher_t {
@@ -129,7 +136,7 @@ inline T readInt() {
         c = getChar();
     for (; '0' <= c && c <= '9'; c = getChar())
         if (minus)
-            x = x * 10 - (c - '0'); // take care about -2^{31}
+            x = x * 10 - (c - '0');  // take care about -2^{31}
         else
             x = x * 10 + (c - '0');
     return x;
@@ -192,7 +199,8 @@ inline void writeInt(T x, char end, int output_len) {
     char s[24];
     int n = 0;
     while (x || !n)
-        s[n++] = '0' + abs((int) (x % 10)), x /= 10;  // `abs`: take care about -2^{31}
+        s[n++] = '0' + abs((int) (x % 10)),
+                x /= 10;  // `abs`: take care about -2^{31}
     while (n < output_len)
         s[n++] = '0';
     while (n--)
@@ -234,7 +242,7 @@ using namespace std::chrono;
 #define FAST_STREAM
 
 int main() {
-    //std::ifstream cin("input.txt");
+    // std::ifstream cin("input.txt");
     std::ios::sync_with_stdio(false);
     std::cin.tie(0);
     std::cout.tie(0);
@@ -259,7 +267,7 @@ int main() {
 #endif
 
     // s0[t][n][k][r]
-    vector<vector<vector<vector<double >> >> s0(T, vector(N, vector(K, vector<double>(R))));
+    vector<vector<vector<vector<double>>>> s0(T, vector(N, vector(K, vector<double>(R))));
     for (int t = 0; t < T; t++) {
         for (int k = 0; k < K; k++) {
             for (int r = 0; r < R; r++) {
@@ -274,10 +282,10 @@ int main() {
         }
     }
 
-    vector<vector<vector<vector<double >> >> d(N, vector(N, vector(K, vector<double>(R))));
+    vector<vector<vector<vector<double>>>> d(N, vector(N, vector(K, vector<double>(R))));
 
     // exp_d[n][m][k][r]
-    vector<vector<vector<vector<double >> >> exp_d(N, vector(N, vector(K, vector<double>(R))));
+    vector<vector<vector<vector<double>>>> exp_d(N, vector(N, vector(K, vector<double>(R))));
     for (int k = 0; k < K; k++) {
         for (int r = 0; r < R; r++) {
             for (int m = 0; m < N; m++) {
@@ -338,7 +346,7 @@ int main() {
     // ==SOLUTION==
     // ============
 
-    auto calc_g = [&](int t, int n) { // NOLINT
+    auto calc_g = [&](int t, int n) {  // NOLINT
         // dp_sum_noeq[k][r]
         vector<vector<double>> dp_sum_noeq(K, vector<double>(R, 1));
         // dp_sum[k][r]
@@ -348,7 +356,8 @@ int main() {
                 if (m != n) {
                     for (int k = 0; k < K; k++) {
                         for (int r = 0; r < R; r++) {
-                            dp_sum[k][r] += s0[t][n][k][r] * p[t][m][k][r] / exp_d[n][m][k][r];
+                            dp_sum[k][r] += s0[t][n][k][r] * p[t][m][k][r] /
+                                            exp_d[n][m][k][r];
                         }
                     }
                 }
@@ -367,7 +376,6 @@ int main() {
 
         double sum = 0;
         for (int k = 0; k < K; k++) {
-
             double accum_prod = 1;
             int count = 0;
             for (int r = 0; r < R; r++) {
@@ -399,11 +407,11 @@ int main() {
     }
 
     struct data {
-        int j; // номер окна
+        int j;  // номер окна
         double g;
     };
 
-    auto solution = [&](const vector<double> &weight_factor) { // NOLINT
+    auto solution = [&](const vector<double> &weight_factor) {  // NOLINT
         for (int t = 0; t < T; t++) {
             for (int n = 0; n < N; n++) {
                 for (int k = 0; k < K; k++) {
@@ -420,9 +428,10 @@ int main() {
 
         map<int, data> users;
 
-        auto do_smaller = [&](int t, int j, double received_TBS) { // NOLINT
+        auto do_smaller = [&](int t, int j, double received_TBS) {  // NOLINT
             auto [TBS, n, t0, _] = Queries[j];
-            // максимально сильно уменьшим применяемую силу, но так, чтобы все еще получали TBS
+            // максимально сильно уменьшим применяемую силу, но так, чтобы все
+            // еще получали TBS
             auto calc_TBS = [&](double power_factor) {
                 double cur_TBS = 0;
                 vector<vector<double>> save_p(K, vector<double>(R));
@@ -463,9 +472,9 @@ int main() {
                 }
             }
 
-            total_g[j] = received_TBS + calc_TBS(1);
+            //total_g[j] = received_TBS + calc_TBS(1);
 
-            //cout << "lol: " << total_g[j] << ' ' << TBS << '\n';
+            // cout << "lol: " << total_g[j] << ' ' << TBS << '\n';
             if (total_g[j] < TBS) {
                 exit(1);
             }
@@ -563,11 +572,11 @@ int main() {
                     }
                 }
 
-                //cout << "weights: ";
-                //for (auto &[weight, n]: kek) {
-                //    cout << weight << ' ';
-                //}
-                //cout << '\n';
+                // cout << "weights: ";
+                // for (auto &[weight, n]: kek) {
+                //     cout << weight << ' ';
+                // }
+                // cout << '\n';
 
                 sort(kek.begin(), kek.end());
                 reverse(kek.begin(), kek.end());
@@ -604,7 +613,8 @@ int main() {
                     }
                     for (int k = 0; k < K; k++) {
                         for (int r = 0; r < R; r++) {
-                            if (sum_weight[k][r] != 0 && abs(sum_weight[k][r] - 1) > 1e-9) {
+                            if (sum_weight[k][r] != 0 &&
+                                abs(sum_weight[k][r] - 1) > 1e-9) {
                                 exit(1);
                             }
                         }
@@ -631,7 +641,6 @@ int main() {
 
             vector<pair<double, int>> need_delete;
             for (auto &[n, data]: users) {
-
                 add_g[t][n] = calc_g(t, n);
                 data.g += add_g[t][n];
 
@@ -649,18 +658,18 @@ int main() {
                 do_smaller(t, j, TBS);
             }
 
-            // remove
-            for (int j: event_remove[t]) {
+            // trivial remove
+            /*for (int j : event_remove[t]) {
                 int n = Queries[j].user_id;
                 if (users.contains(n)) {
                     total_g[j] = users[n].g;
                     users.erase(n);
                 }
-            }
+            }*/
 
             // smart remove
             // проставляет силу 0, если мы не смогли отправить
-            /*vector<pair<double, int>> lol;
+            vector<pair<double, int>> lol;
             for (int j: event_remove[t]) {
                 int n = Queries[j].user_id;
                 if (users.contains(n)) {
@@ -674,6 +683,7 @@ int main() {
                 if (!users.contains(n)) {
                     continue;
                 }
+                total_g[j] = users[n].g;
                 users.erase(n);
 
                 // TODO: если мы не смогли набрать TBS, то нам не нужно было тратить туда силу
@@ -704,7 +714,7 @@ int main() {
                     users.erase(n);
                     do_smaller(t, j, TBS);
                 }
-            }*/
+            }
         }
         return total_g;
     };
@@ -714,8 +724,14 @@ int main() {
     auto ans_power = p;
     int ans_count = 0;
 
-    for (int step = 0;; step++) {
 
+    for (int step = 0;; step++) {
+        /*static mt19937 rnd(42);
+        if (step % 50 == 0) {
+            for (int j = 0; j < J; j++) {
+                weight_factor[j] *= 1 + (int(rnd()) * 1.0 / INT_MAX) / 10;
+            }
+        }*/
         auto time_stop = steady_clock::now();
         auto duration = time_stop - time_start;
         double time = duration_cast<nanoseconds>(duration).count() / 1e9;
@@ -741,21 +757,42 @@ int main() {
         // update weight_factor
         {
             // посмотрим на те, которые нам не удалось передать
-            // возможно им стоило уделить больше внимания: повысить weight_factor
-            // возможно меньше: понизить
+            // возможно им стоило уделить больше внимания: повысить
+            // weight_factor возможно меньше: понизить
 
             for (int j = 0; j < J; j++) {
                 auto [TBS, n, t0, t1] = Queries[j];
                 if (total_g[j] < TBS) {
                     // не дожали
                     // повысим weight_factor?
-                    weight_factor[j] *= 1 + 3 * total_g[j] / TBS;
-                    weight_factor[j] += 2;
+                    weight_factor[j] *= TBS / max(TBS / 3.0, total_g[j]);
+                    // weight_factor[j] += 2;
+                } else if (total_g[j] > TBS) {
+                    weight_factor[j] *= TBS / total_g[j];
                 }
-                /*else if(total_g[j] > TBS){
-
-                }*/
             }
+
+            double min_weight = 0;
+            for (int j = 0; j < J; j++) {
+                min_weight = min(min_weight, weight_factor[j]);
+            }
+            if (min_weight < 0) {
+                for (int j = 0; j < J; j++) {
+                    weight_factor[j] -= min_weight;
+                }
+            }
+
+            double sum_weight = 0;
+            for (int j = 0; j < J; j++) {
+                sum_weight += weight_factor[j];
+            }
+            for (int j = 0; j < J; j++) {
+                weight_factor[j] /= sum_weight;
+            }
+            /*for (int j = 0; j < J; j++) {
+                cout << weight_factor[j] << ' ';
+            }
+            cout << '\n';*/
         }
     }
 
@@ -769,7 +806,7 @@ int main() {
     // ==OUTPUT==
     // ==========
 
-    //cout << fixed << setprecision(10);
+    // cout << fixed << setprecision(10);
     for (int t = 0; t < T; t++) {
         for (int k = 0; k < K; k++) {
             for (int r = 0; r < R; r++) {
