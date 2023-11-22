@@ -356,8 +356,7 @@ int main() {
                 if (m != n) {
                     for (int k = 0; k < K; k++) {
                         for (int r = 0; r < R; r++) {
-                            dp_sum[k][r] += s0[t][n][k][r] * p[t][m][k][r] /
-                                            exp_d[n][m][k][r];
+                            dp_sum[k][r] += s0[t][n][k][r] * p[t][m][k][r] / exp_d[n][m][k][r];
                         }
                     }
                 }
@@ -396,6 +395,9 @@ int main() {
             }
 
             sum += count * log2(1 + std::pow(accum_prod, 1.0 / count));
+        }
+        if (sum < 0 || is_spoiled(sum)) {
+            while (true) {}
         }
         return 192 * sum;
     };
@@ -441,7 +443,7 @@ int main() {
                         p[t][n][k][r] *= power_factor;
                     }
                 }
-                cur_TBS += calc_g(t, n);
+                cur_TBS = calc_g(t, n);
 
                 for (int k = 0; k < K; k++) {
                     for (int r = 0; r < R; r++) {
@@ -545,7 +547,7 @@ int main() {
                         sum_weight[k][r] += weight;
                     }
                     for (auto &[weight, n, k, r]: kek) {
-                        if (sum_weight[k][r] != 0) {
+                        if (sum_weight[k][r] > 1e-9) {
                             weight = weight / sum_weight[k][r];
                         } else {
                             weight = 0;
@@ -564,7 +566,7 @@ int main() {
                         sum_weight[k][r] += weight;
                     }
                     for (auto &[weight, n, k, r]: kek) {
-                        if (sum_weight[k][r] != 0) {
+                        if (sum_weight[k][r] > 1e-9) {
                             weight = weight / sum_weight[k][r];
                         } else {
                             weight = 0;
@@ -592,7 +594,7 @@ int main() {
                         sum_weight[k][r] += weight;
                     }
                     for (auto &[weight, n, k, r]: kek) {
-                        if (sum_weight[k][r] != 0) {
+                        if (sum_weight[k][r] > 0) {
                             weight = weight / sum_weight[k][r];
                         } else {
                             weight = 0;
@@ -607,14 +609,13 @@ int main() {
                     vector<vector<double>> sum_weight(K, vector<double>(R));
                     for (auto [weight, n, k, r]: kek) {
                         sum_weight[k][r] += weight;
-                        if (weight < 0 || weight > 1) {
+                        if (weight < 0 || weight > 1 || is_spoiled(weight)) {
                             exit(1);
                         }
                     }
                     for (int k = 0; k < K; k++) {
                         for (int r = 0; r < R; r++) {
-                            if (sum_weight[k][r] != 0 &&
-                                abs(sum_weight[k][r] - 1) > 1e-9) {
+                            if (sum_weight[k][r] != 0 && abs(sum_weight[k][r] - 1) > 1e-9) {
                                 exit(1);
                             }
                         }
@@ -633,7 +634,9 @@ int main() {
                     sum[k] += p[t][n][k][r];
                 }
                 for (auto [weight, n, k, r]: kek) {
-                    p[t][n][k][r] *= min(1.0, R / sum[k]);
+                    if (sum[k] > 1e-9) {
+                        p[t][n][k][r] *= min(1.0, R / sum[k]);
+                    }
                 }
             }
 
@@ -652,10 +655,10 @@ int main() {
             sort(need_delete.begin(), need_delete.end(), greater<>());
             for (auto [weight, n]: need_delete) {
                 int j = users[n].j;
-                double TBS = users[n].g;
+                double g = users[n].g;
                 total_g[j] = users[n].g;
                 users.erase(n);
-                do_smaller(t, j, TBS);
+                do_smaller(t, j, g);
             }
 
             // trivial remove
@@ -708,11 +711,11 @@ int main() {
                 }
                 sort(need_delete.begin(), need_delete.end(), greater<>());
                 for (auto [weight, n]: need_delete) {
-                    double TBS = users[n].g;
+                    double g = users[n].g;
                     int j = users[n].j;
                     total_g[j] = users[n].g;
                     users.erase(n);
-                    do_smaller(t, j, TBS);
+                    do_smaller(t, j, g);
                 }
             }
         }
@@ -723,7 +726,6 @@ int main() {
 
     auto ans_power = p;
     int ans_count = 0;
-
 
     for (int step = 0;; step++) {
         /*static mt19937 rnd(42);
@@ -762,6 +764,9 @@ int main() {
 
             for (int j = 0; j < J; j++) {
                 auto [TBS, n, t0, t1] = Queries[j];
+                if (total_g[j] < -1) {
+                    exit(1);
+                }
                 if (total_g[j] < TBS) {
                     // не дожали
                     // повысим weight_factor?
@@ -772,15 +777,15 @@ int main() {
                 }
             }
 
-            double min_weight = 0;
-            for (int j = 0; j < J; j++) {
-                min_weight = min(min_weight, weight_factor[j]);
-            }
-            if (min_weight < 0) {
-                for (int j = 0; j < J; j++) {
-                    weight_factor[j] -= min_weight;
-                }
-            }
+            // double min_weight = 0;
+            //            for (int j = 0; j < J; j++) {
+            //                min_weight = min(min_weight, weight_factor[j]);
+            //            }
+            //            if (min_weight < 0) {
+            //                for (int j = 0; j < J; j++) {
+            //                    weight_factor[j] -= min_weight;
+            //                }
+            //            }
 
             double sum_weight = 0;
             for (int j = 0; j < J; j++) {
