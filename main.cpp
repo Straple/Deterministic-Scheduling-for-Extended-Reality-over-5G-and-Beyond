@@ -456,6 +456,9 @@ int main() {
 
             double X = calc_TBS(1);
             received_TBS -= X;
+            if (received_TBS < 0) {
+                exit(1);
+            }
 
             double tl = 0, tr = 1;
             while (tl < tr - 1e-6) {
@@ -662,7 +665,7 @@ int main() {
             }
 
             // trivial remove
-            /*for (int j : event_remove[t]) {
+            /*for (int j: event_remove[t]) {
                 int n = Queries[j].user_id;
                 if (users.contains(n)) {
                     total_g[j] = users[n].g;
@@ -700,7 +703,7 @@ int main() {
 
                 vector<pair<double, int>> need_delete;
                 for (auto &[m, data2]: users) {
-                    for (int time = Queries[j].t0; time <= t; time++) {
+                    for (int time = max(Queries[data2.j].t0, Queries[j].t0); time <= t; time++) {
                         data2.g -= add_g[time][m];
                         add_g[time][m] = calc_g(time, m);
                         data2.g += add_g[time][m];
@@ -764,7 +767,7 @@ int main() {
 
             for (int j = 0; j < J; j++) {
                 auto [TBS, n, t0, t1] = Queries[j];
-                if (total_g[j] < -1) {
+                if (total_g[j] < 0) {
                     exit(1);
                 }
                 if (total_g[j] < TBS) {
@@ -777,15 +780,15 @@ int main() {
                 }
             }
 
-            // double min_weight = 0;
-            //            for (int j = 0; j < J; j++) {
-            //                min_weight = min(min_weight, weight_factor[j]);
-            //            }
-            //            if (min_weight < 0) {
-            //                for (int j = 0; j < J; j++) {
-            //                    weight_factor[j] -= min_weight;
-            //                }
-            //            }
+            /*double min_weight = 0;
+            for (int j = 0; j < J; j++) {
+                min_weight = min(min_weight, weight_factor[j]);
+            }
+            if (min_weight < 0) {
+                for (int j = 0; j < J; j++) {
+                    weight_factor[j] -= min_weight;
+                }
+            }*/
 
             double sum_weight = 0;
             for (int j = 0; j < J; j++) {
