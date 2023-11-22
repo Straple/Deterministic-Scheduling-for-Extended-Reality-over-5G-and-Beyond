@@ -253,7 +253,7 @@ int main() {
 #endif
 
     // s0[t][n][k][r]
-    vector<vector<vector<vector<double>>>> s0(T, vector(N, vector(K, vector<double>(R))));
+    vector < vector < vector < vector < double >> >> s0(T, vector(N, vector(K, vector<double>(R))));
     for (int t = 0; t < T; t++) {
         for (int k = 0; k < K; k++) {
             for (int r = 0; r < R; r++) {
@@ -268,10 +268,10 @@ int main() {
         }
     }
 
-    vector<vector<vector<vector<double>>>> d(N, vector(N, vector(K, vector<double>(R))));
+    vector < vector < vector < vector < double >> >> d(N, vector(N, vector(K, vector<double>(R))));
 
     // exp_d[n][m][k][r]
-    vector<vector<vector<vector<double>>>> exp_d(N, vector(N, vector(K, vector<double>(R))));
+    vector < vector < vector < vector < double >> >> exp_d(N, vector(N, vector(K, vector<double>(R))));
     for (int k = 0; k < K; k++) {
         for (int r = 0; r < R; r++) {
             for (int m = 0; m < N; m++) {
@@ -301,7 +301,7 @@ int main() {
     cin >> J;
 #endif
 
-    vector<message_window> Queries(J);
+    vector <message_window> Queries(J);
     for (int i = 0; i < J; i++) {
         int j;
         int t0, td;
@@ -326,13 +326,13 @@ int main() {
     }
 
     // p[t][n][k][r]
-    vector<vector<vector<vector<double>>>> p(T, vector(N, vector(K, vector<double>(R))));
+    vector < vector < vector < vector < double >> >> p(T, vector(N, vector(K, vector<double>(R))));
 
     // ============
     // ==SOLUTION==
     // ============
 
-    vector<vector<int>> event_add(T), event_remove(T);
+    vector <vector<int>> event_add(T), event_remove(T);
     for (int j = 0; j < J; j++) {
         event_add[Queries[j].t0].push_back(j);
         event_remove[Queries[j].t1].push_back(j);
@@ -346,9 +346,9 @@ int main() {
 
     auto calc_g = [&](int t, int n) { // NOLINT
         // dp_sum_noeq[k][r]
-        vector<vector<double>> dp_sum_noeq(K, vector<double>(R, 1));
+        vector <vector<double>> dp_sum_noeq(K, vector<double>(R, 1));
         // dp_sum[k][r]
-        vector<vector<double>> dp_sum(K, vector<double>(R));
+        vector <vector<double>> dp_sum(K, vector<double>(R));
         {
             for (int m = 0; m < N; m++) {
                 if (m != n) {
@@ -398,7 +398,7 @@ int main() {
         return 192 * sum;
     };
 
-    vector<vector<double>> add_g(T, vector<double>(N));
+    vector <vector<double>> add_g(T, vector<double>(N));
 
     map<int, data> users;
 
@@ -408,7 +408,7 @@ int main() {
         auto calc_TBS = [&](double power_factor) {
             double cur_TBS = 0;
             for (int t = t0; t <= t1; t++) {
-                vector<vector<double>> save_p(K, vector<double>(R));
+                vector <vector<double>> save_p(K, vector<double>(R));
                 for (int k = 0; k < K; k++) {
                     for (int r = 0; r < R; r++) {
                         save_p[k][r] = p[t][n][k][r];
@@ -472,7 +472,7 @@ int main() {
 
         // веса нужны от [0, 1]
         // сумма весов при заданных k, r должна быть равна 1
-        vector<tuple<double, int, int, int>> kek;
+        vector <tuple<double, int, int, int>> kek;
         {
             for (auto [n, data]: users) {
                 auto [TBS, user_id, t0, t1] = Queries[data.j];
@@ -482,6 +482,13 @@ int main() {
                         double weight = 1;
                         weight *= exp(pow((t1 - t0 + 1) * 1.0 / (t1 - t + 1), 2.1));
                         weight /= exp(pow(TBS - data.g, 0.6));
+
+                        for (auto [m, data2]: users) {
+                            if (n != m) {
+                                weight *= pow(exp_d[m][n][k][r], 1);
+                                weight *= pow(exp_d[n][m][k][r], 2.5);
+                            }
+                        }
 
                         kek.emplace_back(weight, n, k, r);
 
@@ -507,7 +514,7 @@ int main() {
 
             // sum
             {
-                vector<vector<double>> sum_weight(K, vector<double>(R));
+                vector <vector<double>> sum_weight(K, vector<double>(R));
                 for (auto [weight, n, k, r]: kek) {
                     sum_weight[k][r] += weight;
                 }
@@ -533,10 +540,9 @@ int main() {
             }
             reverse(kek.begin(), kek.end());
 
-
             // sum
             {
-                vector<vector<double>> sum_weight(K, vector<double>(R));
+                vector <vector<double>> sum_weight(K, vector<double>(R));
                 for (auto [weight, n, k, r]: kek) {
                     sum_weight[k][r] += weight;
                 }
@@ -553,7 +559,7 @@ int main() {
 
             // verify
             {
-                vector<vector<double>> sum_weight(K, vector<double>(R));
+                vector <vector<double>> sum_weight(K, vector<double>(R));
                 for (auto [weight, n, k, r]: kek) {
                     sum_weight[k][r] += weight;
                     if (weight < 0 || weight > 1) {
@@ -606,7 +612,7 @@ int main() {
 
         // remove
 
-        vector<pair<double, int>> lol;
+        vector <pair<double, int>> lol;
         for (int j: event_remove[t]) {
             int n = Queries[j].user_id;
             if (users.contains(n)) {
