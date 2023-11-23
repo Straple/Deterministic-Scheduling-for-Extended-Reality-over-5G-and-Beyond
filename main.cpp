@@ -242,7 +242,7 @@ using namespace std::chrono;
 //#define FAST_STREAM
 
 int main() {
-    for (int ABA = 1; ABA <= 3; ABA++) {
+    for (int ABA = 2; ABA <= 2; ABA++) {
 #ifndef FAST_STREAM
         std::ifstream cin("input.txt");
         if (ABA == 1) {
@@ -781,7 +781,7 @@ int main() {
                     return 1000 * total_g[j] / Queries[j].TBS - Queries[j].TBS;
                 };
                 for (int t = 0; t < T; t++) {
-                    if(!messagease_in_time[t].empty()) {
+                    if (!messagease_in_time[t].empty()) {
                         double sum = 0;
                         for (int j: messagease_in_time[t]) {
                             sum += calc_f(t, j);
@@ -979,15 +979,6 @@ int main() {
             return total_g;
         };
 
-        vector<double> weight_factor(J, 1.0);
-
-        auto ans_power = p;
-        int ans_count = 0;
-        double best_score = 0;
-
-        // 1 раз solution 10586.882 points
-        // 1 секунду solution 11828.898 points с адаптивным weight
-
         auto f = [&](const vector<double> &total_g) {
             double power_sum = 0;
             for (int t = 0; t < T; t++) {
@@ -1005,6 +996,271 @@ int main() {
             }
             return X - 1e-6 * power_sum;
         };
+
+        auto new_solution2 = [&]() { // NOLINT
+            // разделить время на блоки некоторой длины. типа 100 * C
+            // в каждом блоке решать задачу по отдельности
+
+            vector<double> total_g(J);
+
+            /*auto solve = [&](const vector<bool> &used) {
+                // used[j] = true => обязательно нужно доставить j
+
+                // тогда нам обязательно нужно доставить и самые сложно-доставимые из этих
+                // давайте сделаем упор на них, а маленькие как-нибудь уж доставим
+
+                for (int j = 0; j < J; j++) {
+                    total_g[j] = 0;
+                }
+
+                vector<tuple<double, int>> segments(J);
+                for (int j = 0; j < J; j++) {
+                    segments[j] = {Queries[j].TBS, j};
+                }
+                sort(segments.begin(), segments.end(), greater<>());
+                for (auto [difficult, j]: segments) {
+                    // удовлетворим этот запрос так, чтобы не поломать предыдущие
+
+                }
+
+                return true;
+            };*/
+
+            static mt19937 rnd(42);
+
+            vector<double> best_g(J);
+
+            vector<vector<int>> ss(T);
+            for (int j = 0; j < J; j++) {
+                auto [TBS, user_id, t0, t1] = Queries[j];
+                ss[t0].push_back(j);
+            }
+
+            auto solve = [&](int t, vector<int> js) { // NOLINT
+                // веса нужны от [0, 1]
+                // сумма весов при заданных k, r должна быть равна 1
+                vector<tuple<double, int, int, int>> kek;
+                {
+                    for (int j: js) {
+                        auto [TBS, n, t0, t1] = Queries[j];
+
+                        for (int k = 0; k < K; k++) {
+                            for (int r = 0; r < R; r++) {
+                                double weight = 1;
+                                //weight *= exp(pow((t1 - t0 + 1) * 1.0 / (t1 - t + 1), 2.1) - pow(TBS - data.g, 0.5));
+
+                                //weight *= s0[t][n][k][r];
+
+                                /*for(int j2 : js){
+                                    int m = Queries[j2].user_id;
+                                    if (n != m) {
+                                        weight *= exp_d_pow[n][m][k][r];
+                                    }
+                                }*/
+
+                                /*weight += 100;
+                                for (int k2 = 0; k2 < K; k2++) {
+                                    if (k != k2) {
+                                        weight -= pow(s0[t][n][k2][r], 0.5);
+                                    }
+                                }*/
+
+                                kek.emplace_back(weight, n, k, r);
+
+                                if (weight < 0 || is_spoiled(weight)) {
+                                    exit(1);
+                                }
+                            }
+                        }
+                    }
+
+                    // normalize weights
+
+                    // sum
+                    {
+                        vector<vector<double>> sum_weight(K, vector<double>(R));
+                        for (auto [weight, n, k, r]: kek) {
+                            sum_weight[k][r] += weight;
+                        }
+                        for (auto &[weight, n, k, r]: kek) {
+                            if (sum_weight[k][r] != 0) {
+                                weight = weight / sum_weight[k][r];
+                            } else {
+                                weight = 0;
+                            }
+                        }
+                    }
+
+                    // sum
+                    {
+                        vector<vector<double>> sum_weight(K, vector<double>(R));
+                        for (auto [weight, n, k, r]: kek) {
+                            sum_weight[k][r] += weight;
+                        }
+                        for (auto &[weight, n, k, r]: kek) {
+                            if (sum_weight[k][r] != 0) {
+                                weight = weight / sum_weight[k][r];
+                            } else {
+                                weight = 0;
+                            }
+                        }
+                    }
+
+                    // cout << "weights: ";
+                    // for (auto &[weight, n]: kek) {
+                    //     cout << weight << ' ';
+                    // }
+                    // cout << '\n';
+
+                    sort(kek.begin(), kek.end());
+                    reverse(kek.begin(), kek.end());
+                    while (kek.size() > 1 && get<0>(kek.back()) < 0.02) {
+                        kek.pop_back();
+                    }
+                    reverse(kek.begin(), kek.end());
+
+                    // sum
+                    {
+                        vector<vector<double>> sum_weight(K, vector<double>(R));
+                        for (auto [weight, n, k, r]: kek) {
+                            sum_weight[k][r] += weight;
+                        }
+                        for (auto &[weight, n, k, r]: kek) {
+                            if (sum_weight[k][r] != 0) {
+                                weight = weight / sum_weight[k][r];
+                            } else {
+                                weight = 0;
+                            }
+                        }
+                    }
+
+                    sort(kek.begin(), kek.end());
+
+                    // verify
+                    {
+                        vector<vector<double>> sum_weight(K, vector<double>(R));
+                        for (auto [weight, n, k, r]: kek) {
+                            sum_weight[k][r] += weight;
+                            if (weight < 0 || weight > 1 || is_spoiled(weight)) {
+                                exit(1);
+                            }
+                        }
+                        for (int k = 0; k < K; k++) {
+                            for (int r = 0; r < R; r++) {
+                                if (sum_weight[k][r] != 0 && abs(sum_weight[k][r] - 1) > 1e-9) {
+                                    exit(1);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // set power in time t
+                {
+                    for (auto [weight, n, k, r]: kek) {
+                        p[t][n][k][r] = weight * 4;
+                    }
+
+                    vector<double> sum(K);
+                    for (auto [weight, n, k, r]: kek) {
+                        sum[k] += p[t][n][k][r];
+                    }
+                    for (auto [weight, n, k, r]: kek) {
+                        if (sum[k] > 1e-9) {
+                            p[t][n][k][r] *= min(1.0, R / sum[k]);
+                        }
+                    }
+                }
+
+                // update g
+
+                for (auto &[n, data]: users) {
+                    add_g[t][n] = calc_g(t, n);
+                    data.g += add_g[t][n];
+
+                    // мы уже отправили все
+                    if (data.g >= Queries[data.j].TBS) {
+                        need_delete.emplace_back(data.g - Queries[data.j].TBS, n);
+                    }
+                }
+                sort(need_delete.begin(), need_delete.end(), greater<>());
+                for (auto [weight, n]: need_delete) {
+                    int j = users[n].j;
+                    double g = users[n].g;
+                    total_g[j] = users[n].g;
+                    users.erase(n);
+                    do_smaller(t, j, g);
+                }
+                return true;
+            };
+
+            auto build_js = [&](int t, int msk) {
+                vector<int> js;
+                for (int i = 0; i < ss[t].size(); i++) {
+                    if ((msk >> i) & 1) {
+                        js.push_back(ss[t][i]);
+                    }
+                }
+                return js;
+            };
+
+            for (int t = 0; t < T; t++) {
+                if (ss[t].empty()) {
+                    continue;
+                }
+
+                int best_msk = 0;
+                for (int msk = 0; msk < (1 << ss[t].size()); msk++) {
+                    if (solve(t, build_js(t, msk))) {
+                        if (__builtin_popcount(best_msk) < __builtin_popcount(msk)) {
+                            best_msk = msk;
+                        }
+                    }
+                }
+                solve(t, build_js(t, best_msk));
+            }
+            /*for (int step = 0; step < 10; step++) {
+                vector<bool> used(J);
+                for (int j = 0; j < J; j++) {
+                    used[j] = rnd() & 1;
+                }
+                bool ok = solve(used);
+                cout << "ok: " << ok << ' ';
+                if (ok) {
+                    double x = f(total_g);
+                    cout << x;
+                    if (x > f(best_g)) {
+                        best_g = total_g;
+                    }
+                }
+                cout << endl;
+            }*/
+            return best_g;
+        };
+
+        {
+            vector<int> cnt(T);
+            for (int j = 0; j < J; j++) {
+                auto [TBS, user_id, t0, t1] = Queries[j];
+                for (int t = t0; t <= t1; t++) {
+                    cnt[t]++;
+                }
+            }
+            cout << "T: " << T << '\n';
+            for (int t = 0; t < T; t++) {
+                cout << cnt[t] << ' ';
+            }
+            cout << '\n';
+        }
+
+        vector<double> weight_factor(J, 1.0);
+
+        auto ans_power = p;
+        int ans_count = 0;
+        double best_score = 0;
+
+        // 1 раз solution 10586.882 points
+        // 1 секунду solution 11828.898 points с адаптивным weight
 
         // set nice weight_factor
         {
@@ -1059,7 +1315,7 @@ int main() {
                 break;
             }*/
 
-            auto total_g = new_solution();
+            auto total_g = new_solution2();
 
             //
             /*{
