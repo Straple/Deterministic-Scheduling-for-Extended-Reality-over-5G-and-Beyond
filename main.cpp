@@ -2,6 +2,9 @@
 
 using namespace std;
 
+
+namespace KopeliovichStream {
+
 /**
  * Author: Sergey Kopeliovich (Burunduk30@gmail.com)
  */
@@ -15,227 +18,231 @@ using namespace std;
 /** Fast allocation */
 
 #ifdef FAST_ALLOCATOR_MEMORY
-int allocator_pos = 0;
-char allocator_memory[(int)FAST_ALLOCATOR_MEMORY];
+    int allocator_pos = 0;
+    char allocator_memory[(int)FAST_ALLOCATOR_MEMORY];
 
-inline void *operator new(size_t n) {
-    // fprintf(stderr, "n=%ld\n", n);
-    char *res = allocator_memory + allocator_pos;
-    assert(n <= (size_t)((int)FAST_ALLOCATOR_MEMORY - allocator_pos));
-    allocator_pos += n;
-    return (void *)res;
-}
+    inline void *operator new(size_t n) {
+        // fprintf(stderr, "n=%ld\n", n);
+        char *res = allocator_memory + allocator_pos;
+        assert(n <= (size_t)((int)FAST_ALLOCATOR_MEMORY - allocator_pos));
+        allocator_pos += n;
+        return (void *)res;
+    }
 
-inline void operator delete(void *) noexcept {
-}
+    inline void operator delete(void *) noexcept {
+    }
 
-inline void operator delete(void *, size_t) noexcept {
-}
+    inline void operator delete(void *, size_t) noexcept {
+    }
 
-// inline void * operator new [] (size_t) { assert(0); }
-// inline void operator delete [] (void *) { assert(0); }
+    // inline void * operator new [] (size_t) { assert(0); }
+    // inline void operator delete [] (void *) { assert(0); }
 #endif
 
 /** Fast input-output */
 
-template<class T = int>
-inline T readInt();
+    template<class T = int>
+    inline T readInt();
 
-inline double readDouble();
+    inline double readDouble();
 
-inline int readUInt();
+    inline int readUInt();
 
-inline int readChar();  // first non-blank character
-inline void readWord(char *s);
+    inline int readChar();  // first non-blank character
+    inline void readWord(char *s);
 
-inline bool readLine(char *s);  // do not save '\n'
-inline bool isEof();
+    inline bool readLine(char *s);  // do not save '\n'
+    inline bool isEof();
 
-inline int getChar();
+    inline int getChar();
 
-inline int peekChar();
+    inline int peekChar();
 
-inline bool seekEof();
+    inline bool seekEof();
 
-inline void skipBlanks();
+    inline void skipBlanks();
 
-template<class T>
-inline void writeInt(T x, char end = 0, int len = -1);
+    template<class T>
+    inline void writeInt(T x, char end = 0, int len = -1);
 
-inline void writeChar(int x);
+    inline void writeChar(int x);
 
-inline void writeWord(const char *s);
+    inline void writeWord(const char *s);
 
-inline void
-writeDouble(double x, int len = 10);  // works correct only for |x| < 2^{63}
-inline void flush();
+    inline void
+    writeDouble(double x, int len = 10);  // works correct only for |x| < 2^{63}
+    inline void flush();
 
-static struct buffer_flusher_t {
-    ~buffer_flusher_t() {
-        flush();
-    }
-} buffer_flusher;
+    static struct buffer_flusher_t {
+        ~buffer_flusher_t() {
+            flush();
+        }
+    } buffer_flusher;
 
 /** Read */
 
-static const int buf_size = 4096;
+    static const int buf_size = 4096;
 
-static unsigned char buf[buf_size];
-static int buf_len = 0, buf_pos = 0;
+    static unsigned char buf[buf_size];
+    static int buf_len = 0, buf_pos = 0;
 
-inline bool isEof() {
-    if (buf_pos == buf_len) {
-        buf_pos = 0, buf_len = fread(buf, 1, buf_size, stdin);
-        if (buf_pos == buf_len)
-            return 1;
+    inline bool isEof() {
+        if (buf_pos == buf_len) {
+            buf_pos = 0, buf_len = fread(buf, 1, buf_size, stdin);
+            if (buf_pos == buf_len)
+                return 1;
+        }
+        return 0;
     }
-    return 0;
-}
 
-inline int getChar() {
-    return isEof() ? -1 : buf[buf_pos++];
-}
+    inline int getChar() {
+        return isEof() ? -1 : buf[buf_pos++];
+    }
 
-inline int peekChar() {
-    return isEof() ? -1 : buf[buf_pos];
-}
+    inline int peekChar() {
+        return isEof() ? -1 : buf[buf_pos];
+    }
 
-inline bool seekEof() {
-    int c;
-    while ((c = peekChar()) != -1 && c <= 32)
-        buf_pos++;
-    return c == -1;
-}
+    inline bool seekEof() {
+        int c;
+        while ((c = peekChar()) != -1 && c <= 32)
+            buf_pos++;
+        return c == -1;
+    }
 
-inline void skipBlanks() {
-    while (!isEof() && buf[buf_pos] <= 32U)
-        buf_pos++;
-}
+    inline void skipBlanks() {
+        while (!isEof() && buf[buf_pos] <= 32U)
+            buf_pos++;
+    }
 
-inline int readChar() {
-    int c = getChar();
-    while (c != -1 && c <= 32)
-        c = getChar();
-    return c;
-}
+    inline int readChar() {
+        int c = getChar();
+        while (c != -1 && c <= 32)
+            c = getChar();
+        return c;
+    }
 
-inline int readUInt() {
-    int c = readChar(), x = 0;
-    while ('0' <= c && c <= '9')
-        x = x * 10 + (c - '0'), c = getChar();
-    return x;
-}
-
-template<class T>
-inline T readInt() {
-    int minus = 0, c = readChar();
-    T x = 0;
-    if (c == '-')
-        minus = 1, c = getChar();
-    else if (c == '+')
-        c = getChar();
-    for (; '0' <= c && c <= '9'; c = getChar())
-        if (minus)
-            x = x * 10 - (c - '0');  // take care about -2^{31}
-        else
-            x = x * 10 + (c - '0');
-    return x;
-}
-
-inline double readDouble() {
-    int s = 1, c = readChar();
-    double x = 0;
-    if (c == '-')
-        s = -1, c = getChar();
-    while ('0' <= c && c <= '9')
-        x = x * 10 + (c - '0'), c = getChar();
-    if (c == '.') {
-        c = getChar();
-        double coef = 1;
+    inline int readUInt() {
+        int c = readChar(), x = 0;
         while ('0' <= c && c <= '9')
-            x += (c - '0') * (coef *= 1e-1), c = getChar();
+            x = x * 10 + (c - '0'), c = getChar();
+        return x;
     }
-    return s == 1 ? x : -x;
-}
 
-inline void readWord(char *s) {
-    int c = readChar();
-    while (c > 32)
-        *s++ = c, c = getChar();
-    *s = 0;
-}
+    template<class T>
+    inline T readInt() {
+        int minus = 0, c = readChar();
+        T x = 0;
+        if (c == '-')
+            minus = 1, c = getChar();
+        else if (c == '+')
+            c = getChar();
+        for (; '0' <= c && c <= '9'; c = getChar())
+            if (minus)
+                x = x * 10 - (c - '0');  // take care about -2^{31}
+            else
+                x = x * 10 + (c - '0');
+        return x;
+    }
 
-inline bool readLine(char *s) {
-    int c = getChar();
-    while (c != '\n' && c != -1)
-        *s++ = c, c = getChar();
-    *s = 0;
-    return c != -1;
-}
+    inline double readDouble() {
+        int s = 1, c = readChar();
+        double x = 0;
+        if (c == '-')
+            s = -1, c = getChar();
+        while ('0' <= c && c <= '9')
+            x = x * 10 + (c - '0'), c = getChar();
+        if (c == '.') {
+            c = getChar();
+            double coef = 1;
+            while ('0' <= c && c <= '9')
+                x += (c - '0') * (coef *= 1e-1), c = getChar();
+        }
+        return s == 1 ? x : -x;
+    }
+
+    inline void readWord(char *s) {
+        int c = readChar();
+        while (c > 32)
+            *s++ = c, c = getChar();
+        *s = 0;
+    }
+
+    inline bool readLine(char *s) {
+        int c = getChar();
+        while (c != '\n' && c != -1)
+            *s++ = c, c = getChar();
+        *s = 0;
+        return c != -1;
+    }
 
 /** Write */
 
-static int write_buf_pos = 0;
-static char write_buf[buf_size];
+    static int write_buf_pos = 0;
+    static char write_buf[buf_size];
 
-inline void writeChar(int x) {
-    if (write_buf_pos == buf_size)
-        fwrite(write_buf, 1, buf_size, stdout), write_buf_pos = 0;
-    write_buf[write_buf_pos++] = x;
-}
-
-inline void flush() {
-    if (write_buf_pos) {
-        fwrite(write_buf, 1, write_buf_pos, stdout), write_buf_pos = 0;
-        fflush(stdout);
+    inline void writeChar(int x) {
+        if (write_buf_pos == buf_size)
+            fwrite(write_buf, 1, buf_size, stdout), write_buf_pos = 0;
+        write_buf[write_buf_pos++] = x;
     }
-}
 
-template<class T>
-inline void writeInt(T x, char end, int output_len) {
-    if (x < 0)
-        writeChar('-');
+    inline void flush() {
+        if (write_buf_pos) {
+            fwrite(write_buf, 1, write_buf_pos, stdout), write_buf_pos = 0;
+            fflush(stdout);
+        }
+    }
 
-    char s[24];
-    int n = 0;
-    while (x || !n)
-        s[n++] = '0' + abs((int) (x % 10)),
-                x /= 10;  // `abs`: take care about -2^{31}
-    while (n < output_len)
-        s[n++] = '0';
-    while (n--)
-        writeChar(s[n]);
-    if (end)
-        writeChar(end);
-}
+    template<class T>
+    inline void writeInt(T x, char end, int output_len) {
+        if (x < 0)
+            writeChar('-');
 
-inline void writeWord(const char *s) {
-    while (*s)
-        writeChar(*s++);
-}
+        char s[24];
+        int n = 0;
+        while (x || !n)
+            s[n++] = '0' + abs((int) (x % 10)),
+                    x /= 10;  // `abs`: take care about -2^{31}
+        while (n < output_len)
+            s[n++] = '0';
+        while (n--)
+            writeChar(s[n]);
+        if (end)
+            writeChar(end);
+    }
 
-inline void writeDouble(double x, int output_len) {
-    if (x < 0)
-        writeChar('-'), x = -x;
-    assert(x <= (1LLU << 63) - 1);
-    long long t = (long long) x;
-    writeInt(t), x -= t;
-    writeChar('.');
-    for (int i = output_len - 1; i > 0; i--) {
+    inline void writeWord(const char *s) {
+        while (*s)
+            writeChar(*s++);
+    }
+
+    inline void writeDouble(double x, int output_len) {
+        if (x < 0)
+            writeChar('-'), x = -x;
+        assert(x <= (1LLU << 63) - 1);
+        long long t = (long long) x;
+        writeInt(t), x -= t;
+        writeChar('.');
+        for (int i = output_len - 1; i > 0; i--) {
+            x *= 10;
+            t = std::min(9, (int) x);
+            writeChar('0' + t), x -= t;
+        }
         x *= 10;
-        t = std::min(9, (int) x);
-        writeChar('0' + t), x -= t;
+        t = std::min(9, (int) (x + 0.5));
+        writeChar('0' + t);
     }
-    x *= 10;
-    t = std::min(9, (int) (x + 0.5));
-    writeChar('0' + t);
+
 }
+
+using namespace KopeliovichStream;
 
 bool is_spoiled(double num) {
     return std::isnan(num) || std::isinf(num);
 }
 
-#define FAST_STREAM
+//#define FAST_STREAM
 
 #define DEBUG_MODE
 
@@ -411,11 +418,29 @@ struct Solution {
     }
 
     vector<tuple<double, int, int, int>> build_weights_of_power(int t, const vector<int> &js) {
-        vector<tuple<double, int, int, int>> set_of_weights;
+        // requests_weights[r] = {}
+        vector<vector<tuple<double, int>>> requests_weights(R);
         for (int j: js) {
             auto [TBS, n, t0, t1] = requests[j];
+            for (int r = 0; r < R; r++) {
+                double weight = 1;
+                ASSERT(total_g[j] < TBS, "failed");
 
-            for (int k = 0; k < K; k++) {
+                for(int k = 0; k < K; k++){
+                    for (int j2: js) {
+                        int m = requests[j2].n;
+                        if (n != m) {
+                            weight /= exp_d_pow[m][n][k][r];
+                        }
+                    }
+                }
+
+                ASSERT(weight >= 0 && !is_spoiled(weight), "invalid weight");
+
+                requests_weights[r].emplace_back(weight, j);
+            }
+
+            /*for (int k = 0; k < K; k++) {
                 for (int r = 0; r < R; r++) {
                     double weight = 1;
 
@@ -434,6 +459,34 @@ struct Solution {
 
                     set_of_weights.emplace_back(weight, n, k, r);
                 }
+            }*/
+        }
+
+        vector<tuple<double, int, int, int>> set_of_weights;
+        for (int r = 0; r < R; r++) {
+            sort(requests_weights[r].begin(), requests_weights[r].end(), greater<>());
+
+            auto [request_weight, j] = requests_weights[r][0];
+
+            auto [TBS, n, t0, t1] = requests[j];
+
+            for (int k = 0; k < K; k++) {
+                double weight = 1;
+
+                ASSERT(total_g[j] < TBS, "failed");
+
+                weight *= exp(-sqrt(TBS) - sqrt(TBS - total_g[j]));
+
+                for (int j2: js) {
+                    int m = requests[j2].n;
+                    if (n != m) {
+                        weight *= exp_d_pow[n][m][k][r];
+                    }
+                }
+
+                ASSERT(weight >= 0 && !is_spoiled(weight), "invalid weight");
+
+                set_of_weights.emplace_back(weight, n, k, r);
             }
         }
 
@@ -686,25 +739,25 @@ int main() {
             ASSERT(false, "what is test case?");
         }
 #endif
-    //std::ios::sync_with_stdio(false);
-    //std::cin.tie(0);
-    //std::cout.tie(0);
+        //std::ios::sync_with_stdio(false);
+        //std::cin.tie(0);
+        //std::cout.tie(0);
 
-    Solution solution;
+        Solution solution;
 #ifdef FAST_STREAM
-    solution.read();
+        solution.read();
 #else
-    solution.read(input);
+        solution.read(input);
 #endif
 
-    solution.solve();
+        solution.solve();
 
 #ifndef FAST_STREAM
-    cout << solution.get_score() << '/' << solution.J << '\n';
+        cout << solution.get_score() << '/' << solution.J << '\n';
 #endif
 
 #ifdef FAST_STREAM
-    solution.print();
+        solution.print();
 #endif
 
 #ifndef FAST_STREAM
