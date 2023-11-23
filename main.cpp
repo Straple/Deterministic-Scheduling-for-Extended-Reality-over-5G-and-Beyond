@@ -235,11 +235,7 @@ bool is_spoiled(double num) {
     return std::isnan(num) || std::isinf(num);
 }
 
-#include <chrono>
-
-using namespace std::chrono;
-
-//#define FAST_STREAM
+#define FAST_STREAM
 
 #define DEBUG_MODE
 
@@ -425,7 +421,14 @@ struct Solution {
 
                     ASSERT(total_g[j] < TBS, "failed");
 
-                    weight /= exp(sqrt(TBS));
+                    weight *= exp(-sqrt(TBS) - sqrt(TBS - total_g[j]));
+
+                    for(int j2 : js){
+                        int m = requests[j2].n;
+                        if (n != m) {
+                            weight *= exp_d_pow[n][m][k][r];
+                        }
+                    }
 
                     ASSERT(weight >= 0 && !is_spoiled(weight), "invalid weight");
 
