@@ -427,12 +427,7 @@ struct Solution {
                 ASSERT(total_g[j] < TBS, "failed");
 
                 for(int k = 0; k < K; k++){
-                    for (int j2: js) {
-                        int m = requests[j2].n;
-                        if (n != m) {
-                            weight /= exp_d_pow[m][n][k][r];
-                        }
-                    }
+                    weight += s0[t][n][k][r];
                 }
 
                 ASSERT(weight >= 0 && !is_spoiled(weight), "invalid weight");
@@ -467,6 +462,17 @@ struct Solution {
             sort(requests_weights[r].begin(), requests_weights[r].end(), greater<>());
 
             auto [request_weight, j] = requests_weights[r][0];
+
+            // relax other request_weights[r]
+            {
+                for(int r2 = r + 1; r2 < R; r2++){
+                    for(auto &[request_weight, j2] : requests_weights[r2]){
+                        if(j == j2){
+                            request_weight *= 0.5;
+                        }
+                    }
+                }
+            }
 
             auto [TBS, n, t0, t1] = requests[j];
 
