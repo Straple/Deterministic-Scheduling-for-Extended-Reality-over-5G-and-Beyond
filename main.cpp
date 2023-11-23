@@ -242,7 +242,7 @@ bool is_spoiled(double num) {
     return std::isnan(num) || std::isinf(num);
 }
 
-//#define FAST_STREAM
+#define FAST_STREAM
 
 #define DEBUG_MODE
 
@@ -426,8 +426,8 @@ struct Solution {
                 double weight = 1;
                 ASSERT(total_g[j] < TBS, "failed");
 
-                for(int k = 0; k < K; k++){
-                    weight += s0[t][n][k][r];
+                for (int k = 0; k < K; k++) {
+                    weight *= s0[t][n][k][r];
                 }
 
                 ASSERT(weight >= 0 && !is_spoiled(weight), "invalid weight");
@@ -465,10 +465,12 @@ struct Solution {
 
             // relax other request_weights[r]
             {
-                for(int r2 = r + 1; r2 < R; r2++){
-                    for(auto &[request_weight, j2] : requests_weights[r2]){
-                        if(j == j2){
-                            request_weight *= 0.0001;
+                for (int r2 = 0; r2 < R; r2++) {
+                    if (r2 != r) {
+                        for (auto &[request_weight, j2]: requests_weights[r2]) {
+                            if (j == j2) {
+                                request_weight = 0;
+                            }
                         }
                     }
                 }
@@ -544,10 +546,6 @@ struct Solution {
         fix_sum();
         threshold();
         fix_sum();
-
-        // 118.992/150
-        // 146.998/829
-        // 183.995/184
 
         /*{
             // а давайте посмотрим на эти веса
@@ -745,25 +743,25 @@ int main() {
             ASSERT(false, "what is test case?");
         }
 #endif
-        //std::ios::sync_with_stdio(false);
-        //std::cin.tie(0);
-        //std::cout.tie(0);
+    //std::ios::sync_with_stdio(false);
+    //std::cin.tie(0);
+    //std::cout.tie(0);
 
-        Solution solution;
+    Solution solution;
 #ifdef FAST_STREAM
-        solution.read();
+    solution.read();
 #else
-        solution.read(input);
+    solution.read(input);
 #endif
 
-        solution.solve();
+    solution.solve();
 
 #ifndef FAST_STREAM
-        cout << solution.get_score() << '/' << solution.J << '\n';
+    cout << solution.get_score() << '/' << solution.J << '\n';
 #endif
 
 #ifdef FAST_STREAM
-        solution.print();
+    solution.print();
 #endif
 
 #ifndef FAST_STREAM
