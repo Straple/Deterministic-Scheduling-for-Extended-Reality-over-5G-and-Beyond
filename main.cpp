@@ -277,6 +277,8 @@ int main() {
         R = readInt();
 #else
         cin >> N >> K >> T >> R;
+
+        //const int COEF_T = 2;
 #endif
 
         // s0[t][n][k][r]
@@ -454,7 +456,7 @@ int main() {
             map<int, data> users;
 
             auto do_smaller = [&](int t, int j, double received_TBS) {  // NOLINT
-                auto [TBS, n, t0, _] = Queries[j];
+                /*auto [TBS, n, t0, _] = Queries[j];
                 // максимально сильно уменьшим применяемую силу, но так, чтобы все еще получали TBS
                 auto calc_TBS = [&](double power_factor) {
                     vector<vector<double>> save_p(K, vector<double>(R));
@@ -523,7 +525,7 @@ int main() {
                 for (int n: need_delete) {
                     total_g[users[n].j] = users[n].g;
                     users.erase(n);
-                }
+                }*/
             };
 
             for (int t = 0; t < T; t++) {
@@ -545,7 +547,7 @@ int main() {
                                 double weight = 1;
                                 weight *= exp(pow((t1 - t0 + 1) * 1.0 / (t1 - t + 1), 2.1) - pow(TBS - data.g, 0.5));
 
-                                //weight *= s0[t][n][k][r];
+                                //weight /= s0[t][n][k][r];
 
                                 for (auto [m, data2]: users) {
                                     if (n != m) {
@@ -693,17 +695,17 @@ int main() {
                 }
 
                 // trivial remove
-                /*for (int j: event_remove[t]) {
+                for (int j: event_remove[t]) {
                     int n = Queries[j].user_id;
                     if (users.contains(n)) {
                         total_g[j] = users[n].g;
                         users.erase(n);
                     }
-                }*/
+                }
 
                 // smart remove
                 // проставляет силу 0, если мы не смогли отправить
-                vector<pair<double, int>> lol;
+                /*vector<pair<double, int>> lol;
                 for (int j: event_remove[t]) {
                     int n = Queries[j].user_id;
                     if (users.contains(n)) {
@@ -752,229 +754,7 @@ int main() {
                         users.erase(n);
                         do_smaller(t, j, g);
                     }
-                }
-            }
-            return total_g;
-        };
-
-        auto new_solution = [&]() { // NOLINT
-            // давайте не будем заниматься сканлайном, а смотреть на всю проблему сверху
-            // возможно так будет больше возможностей что-то улучшить
-
-            vector<vector<int>> messagease_in_time(T);
-            for (int j = 0; j < J; j++) {
-                auto [TBS, n, t0, t1] = Queries[j];
-                for (int t = t0; t <= t1; t++) {
-                    messagease_in_time[t].push_back(j);
-                }
-            }
-
-            vector<double> total_g(J);
-
-            while (true) {
-                // давайте найдем времена, в которых только один отрезок
-                // тогда нам наиболее выгодно туда влить силу, так как другие не помешают
-
-                int best_time = -1;
-                double best_f = 0;
-                auto calc_f = [&](int t, int j) -> double {
-                    return 1000 * total_g[j] / Queries[j].TBS - Queries[j].TBS;
-                };
-                for (int t = 0; t < T; t++) {
-                    if (!messagease_in_time[t].empty()) {
-                        double sum = 0;
-                        for (int j: messagease_in_time[t]) {
-                            sum += calc_f(t, j);
-                        }
-                        if (best_time == -1 || sum > best_f) {
-                            best_f = sum;
-                            best_time = t;
-                        }
-                    }
-                }
-                if (best_time == -1) {
-                    break;
-                }
-
-                {
-                    // веса нужны от [0, 1]
-                    // сумма весов при заданных k, r должна быть равна 1
-                    vector<tuple<double, int, int, int>> kek;
-                    {
-                        for (int j: messagease_in_time[best_time]) {
-                            auto [TBS, n, t0, t1] = Queries[j];
-
-                            for (int k = 0; k < K; k++) {
-                                for (int r = 0; r < R; r++) {
-                                    double weight = 1;
-                                    int ost_len = 0;
-                                    for (int t = t0; t <= t1; t++) {
-                                        ost_len += !messagease_in_time[t].empty();
-                                    }
-                                    //weight *= exp(pow((t1 - t0 + 1) * 1.0 / (t1 - t + 1), 2.1) - pow(TBS - data.g, 0.5));
-
-                                    // weight *= exp(pow(ost_len / (t1 - t0 + 1), 2) - pow(TBS - total_g[j], 0.5));
-                                    weight *= exp(pow(ost_len, 2) - pow(TBS - total_g[j], 0.4));
-
-                                    for (int j2: messagease_in_time[best_time]) {
-                                        int m = Queries[j2].user_id;
-                                        if (n != m) {
-                                            weight *= exp_d_pow[n][m][k][r];
-                                        }
-                                    }
-
-                                    kek.emplace_back(weight, n, k, r);
-
-                                    if (weight < 0 || is_spoiled(weight)) {
-                                        cout << weight << endl;
-                                        exit(1);
-                                    }
-                                }
-                            }
-                        }
-
-                        // normalize weights
-
-                        // sum
-                        {
-                            vector<vector<double>> sum_weight(K, vector<double>(R));
-                            for (auto [weight, n, k, r]: kek) {
-                                sum_weight[k][r] += weight;
-                            }
-                            for (auto &[weight, n, k, r]: kek) {
-                                if (sum_weight[k][r] != 0) {
-                                    weight = weight / sum_weight[k][r];
-                                } else {
-                                    weight = 0;
-                                }
-                            }
-                        }
-
-                        // sum
-                        {
-                            vector<vector<double>> sum_weight(K, vector<double>(R));
-                            for (auto [weight, n, k, r]: kek) {
-                                sum_weight[k][r] += weight;
-                            }
-                            for (auto &[weight, n, k, r]: kek) {
-                                if (sum_weight[k][r] != 0) {
-                                    weight = weight / sum_weight[k][r];
-                                } else {
-                                    weight = 0;
-                                }
-                            }
-                        }
-
-                        // cout << "weights: ";
-                        // for (auto &[weight, n]: kek) {
-                        //     cout << weight << ' ';
-                        // }
-                        // cout << '\n';
-
-                        sort(kek.begin(), kek.end());
-                        reverse(kek.begin(), kek.end());
-                        while (kek.size() > 1 && get<0>(kek.back()) < 0.02) {
-                            kek.pop_back();
-                        }
-                        reverse(kek.begin(), kek.end());
-
-                        // sum
-                        {
-                            vector<vector<double>> sum_weight(K, vector<double>(R));
-                            for (auto [weight, n, k, r]: kek) {
-                                sum_weight[k][r] += weight;
-                            }
-                            for (auto &[weight, n, k, r]: kek) {
-                                if (sum_weight[k][r] != 0) {
-                                    weight = weight / sum_weight[k][r];
-                                } else {
-                                    weight = 0;
-                                }
-                            }
-                        }
-
-                        sort(kek.begin(), kek.end());
-
-                        // verify
-                        {
-                            vector<vector<double>> sum_weight(K, vector<double>(R));
-                            for (auto [weight, n, k, r]: kek) {
-                                sum_weight[k][r] += weight;
-                                if (weight < 0 || weight > 1 || is_spoiled(weight)) {
-                                    exit(1);
-                                }
-                            }
-                            for (int k = 0; k < K; k++) {
-                                for (int r = 0; r < R; r++) {
-                                    if (sum_weight[k][r] != 0 && abs(sum_weight[k][r] - 1) > 1e-9) {
-                                        exit(1);
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // set power in time t
-                    {
-                        for (auto [weight, n, k, r]: kek) {
-                            p[best_time][n][k][r] = weight * 4;
-                        }
-
-                        vector<double> sum(K);
-                        for (auto [weight, n, k, r]: kek) {
-                            sum[k] += p[best_time][n][k][r];
-                        }
-                        for (auto [weight, n, k, r]: kek) {
-                            if (sum[k] > 1e-9) {
-                                p[best_time][n][k][r] *= min(1.0, R / sum[k]);
-                            }
-                        }
-                    }
-
-                    // update total_g
-                    for (int j: messagease_in_time[best_time]) {
-                        auto [TBS, n, t0, t1] = Queries[j];
-                        total_g[j] += calc_g(best_time, n);
-                        if (total_g[j] >= TBS) {
-                            for (int t = t0; t <= t1; t++) {
-                                if (!messagease_in_time[t].empty() && t != best_time) {
-                                    messagease_in_time[t].erase(
-                                            std::find(messagease_in_time[t].begin(), messagease_in_time[t].end(), j));
-                                }
-                            }
-                        }
-                    }
-
-                    /*cout << "NICE\n";
-                    find = true;
-                    int j = messagease_in_time[t].back();
-                    messagease_in_time[t].pop_back();
-                    auto [TBS, n, t0, t1] = Queries[j];
-
-                    for (int k = 0; k < K; k++) {
-                        for (int r = 0; r < R; r++) {
-                            p[t][n][k][r] = 4;
-                        }
-                    }
-
-                    vector<double> sum(K);
-                    for (int k = 0; k < K; k++) {
-                        for (int r = 0; r < R; r++) {
-                            sum[k] += p[t][n][k][r];
-                        }
-                    }
-                    for (int k = 0; k < K; k++) {
-                        for (int r = 0; r < R; r++) {
-                            if (sum[k] > 1e-9) {
-                                p[t][n][k][r] *= min(1.0, R / sum[k]);
-                            }
-                        }
-                    }
-
-                    total_g[j] += calc_g(t, n);*/
-                }
-
-                messagease_in_time[best_time].clear();
+                }*/
             }
             return total_g;
         };
@@ -997,267 +777,12 @@ int main() {
             return X - 1e-6 * power_sum;
         };
 
-        auto new_solution2 = [&]() { // NOLINT
-            // разделить время на блоки некоторой длины. типа 100 * C
-            // в каждом блоке решать задачу по отдельности
-
-            vector<double> total_g(J);
-
-            /*auto solve = [&](const vector<bool> &used) {
-                // used[j] = true => обязательно нужно доставить j
-
-                // тогда нам обязательно нужно доставить и самые сложно-доставимые из этих
-                // давайте сделаем упор на них, а маленькие как-нибудь уж доставим
-
-                for (int j = 0; j < J; j++) {
-                    total_g[j] = 0;
-                }
-
-                vector<tuple<double, int>> segments(J);
-                for (int j = 0; j < J; j++) {
-                    segments[j] = {Queries[j].TBS, j};
-                }
-                sort(segments.begin(), segments.end(), greater<>());
-                for (auto [difficult, j]: segments) {
-                    // удовлетворим этот запрос так, чтобы не поломать предыдущие
-
-                }
-
-                return true;
-            };*/
-
-            static mt19937 rnd(42);
-
-            vector<double> best_g(J);
-
-            vector<vector<int>> ss(T);
-            for (int j = 0; j < J; j++) {
-                auto [TBS, user_id, t0, t1] = Queries[j];
-                ss[t0].push_back(j);
-            }
-
-            auto solve = [&](int t, vector<int> js) { // NOLINT
-                // веса нужны от [0, 1]
-                // сумма весов при заданных k, r должна быть равна 1
-                vector<tuple<double, int, int, int>> kek;
-                {
-                    for (int j: js) {
-                        auto [TBS, n, t0, t1] = Queries[j];
-
-                        for (int k = 0; k < K; k++) {
-                            for (int r = 0; r < R; r++) {
-                                double weight = 1;
-                                //weight *= exp(pow((t1 - t0 + 1) * 1.0 / (t1 - t + 1), 2.1) - pow(TBS - data.g, 0.5));
-
-                                //weight *= s0[t][n][k][r];
-
-                                /*for(int j2 : js){
-                                    int m = Queries[j2].user_id;
-                                    if (n != m) {
-                                        weight *= exp_d_pow[n][m][k][r];
-                                    }
-                                }*/
-
-                                /*weight += 100;
-                                for (int k2 = 0; k2 < K; k2++) {
-                                    if (k != k2) {
-                                        weight -= pow(s0[t][n][k2][r], 0.5);
-                                    }
-                                }*/
-
-                                kek.emplace_back(weight, n, k, r);
-
-                                if (weight < 0 || is_spoiled(weight)) {
-                                    exit(1);
-                                }
-                            }
-                        }
-                    }
-
-                    // normalize weights
-
-                    // sum
-                    {
-                        vector<vector<double>> sum_weight(K, vector<double>(R));
-                        for (auto [weight, n, k, r]: kek) {
-                            sum_weight[k][r] += weight;
-                        }
-                        for (auto &[weight, n, k, r]: kek) {
-                            if (sum_weight[k][r] != 0) {
-                                weight = weight / sum_weight[k][r];
-                            } else {
-                                weight = 0;
-                            }
-                        }
-                    }
-
-                    // sum
-                    {
-                        vector<vector<double>> sum_weight(K, vector<double>(R));
-                        for (auto [weight, n, k, r]: kek) {
-                            sum_weight[k][r] += weight;
-                        }
-                        for (auto &[weight, n, k, r]: kek) {
-                            if (sum_weight[k][r] != 0) {
-                                weight = weight / sum_weight[k][r];
-                            } else {
-                                weight = 0;
-                            }
-                        }
-                    }
-
-                    // cout << "weights: ";
-                    // for (auto &[weight, n]: kek) {
-                    //     cout << weight << ' ';
-                    // }
-                    // cout << '\n';
-
-                    sort(kek.begin(), kek.end());
-                    reverse(kek.begin(), kek.end());
-                    while (kek.size() > 1 && get<0>(kek.back()) < 0.02) {
-                        kek.pop_back();
-                    }
-                    reverse(kek.begin(), kek.end());
-
-                    // sum
-                    {
-                        vector<vector<double>> sum_weight(K, vector<double>(R));
-                        for (auto [weight, n, k, r]: kek) {
-                            sum_weight[k][r] += weight;
-                        }
-                        for (auto &[weight, n, k, r]: kek) {
-                            if (sum_weight[k][r] != 0) {
-                                weight = weight / sum_weight[k][r];
-                            } else {
-                                weight = 0;
-                            }
-                        }
-                    }
-
-                    sort(kek.begin(), kek.end());
-
-                    // verify
-                    {
-                        vector<vector<double>> sum_weight(K, vector<double>(R));
-                        for (auto [weight, n, k, r]: kek) {
-                            sum_weight[k][r] += weight;
-                            if (weight < 0 || weight > 1 || is_spoiled(weight)) {
-                                exit(1);
-                            }
-                        }
-                        for (int k = 0; k < K; k++) {
-                            for (int r = 0; r < R; r++) {
-                                if (sum_weight[k][r] != 0 && abs(sum_weight[k][r] - 1) > 1e-9) {
-                                    exit(1);
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // set power in time t
-                {
-                    for (auto [weight, n, k, r]: kek) {
-                        p[t][n][k][r] = weight * 4;
-                    }
-
-                    vector<double> sum(K);
-                    for (auto [weight, n, k, r]: kek) {
-                        sum[k] += p[t][n][k][r];
-                    }
-                    for (auto [weight, n, k, r]: kek) {
-                        if (sum[k] > 1e-9) {
-                            p[t][n][k][r] *= min(1.0, R / sum[k]);
-                        }
-                    }
-                }
-
-                // update g
-
-                for (auto &[n, data]: users) {
-                    add_g[t][n] = calc_g(t, n);
-                    data.g += add_g[t][n];
-
-                    // мы уже отправили все
-                    if (data.g >= Queries[data.j].TBS) {
-                        need_delete.emplace_back(data.g - Queries[data.j].TBS, n);
-                    }
-                }
-                sort(need_delete.begin(), need_delete.end(), greater<>());
-                for (auto [weight, n]: need_delete) {
-                    int j = users[n].j;
-                    double g = users[n].g;
-                    total_g[j] = users[n].g;
-                    users.erase(n);
-                    do_smaller(t, j, g);
-                }
-                return true;
-            };
-
-            auto build_js = [&](int t, int msk) {
-                vector<int> js;
-                for (int i = 0; i < ss[t].size(); i++) {
-                    if ((msk >> i) & 1) {
-                        js.push_back(ss[t][i]);
-                    }
-                }
-                return js;
-            };
-
-            for (int t = 0; t < T; t++) {
-                if (ss[t].empty()) {
-                    continue;
-                }
-
-                int best_msk = 0;
-                for (int msk = 0; msk < (1 << ss[t].size()); msk++) {
-                    if (solve(t, build_js(t, msk))) {
-                        if (__builtin_popcount(best_msk) < __builtin_popcount(msk)) {
-                            best_msk = msk;
-                        }
-                    }
-                }
-                solve(t, build_js(t, best_msk));
-            }
-            /*for (int step = 0; step < 10; step++) {
-                vector<bool> used(J);
-                for (int j = 0; j < J; j++) {
-                    used[j] = rnd() & 1;
-                }
-                bool ok = solve(used);
-                cout << "ok: " << ok << ' ';
-                if (ok) {
-                    double x = f(total_g);
-                    cout << x;
-                    if (x > f(best_g)) {
-                        best_g = total_g;
-                    }
-                }
-                cout << endl;
-            }*/
-            return best_g;
-        };
-
-        {
-            vector<int> cnt(T);
-            for (int j = 0; j < J; j++) {
-                auto [TBS, user_id, t0, t1] = Queries[j];
-                for (int t = t0; t <= t1; t++) {
-                    cnt[t]++;
-                }
-            }
-            cout << "T: " << T << '\n';
-            for (int t = 0; t < T; t++) {
-                cout << cnt[t] << ' ';
-            }
-            cout << '\n';
-        }
-
         vector<double> weight_factor(J, 1.0);
 
         auto ans_power = p;
         int ans_count = 0;
         double best_score = 0;
+        vector<double> ans_g;
 
         // 1 раз solution 10586.882 points
         // 1 секунду solution 11828.898 points с адаптивным weight
@@ -1315,7 +840,8 @@ int main() {
                 break;
             }*/
 
-            auto total_g = new_solution2();
+            auto total_g = solution(weight_factor);
+            ans_g = total_g;
 
             //
             /*{
@@ -1392,6 +918,24 @@ int main() {
         }
 
         cout << "score: " << best_score << '/' << J << endl;
+
+        {
+            vector<int> cnt(T), cntok(T);
+            for (int j = 0; j < J; j++) {
+                auto [TBS, user_id, t0, t1] = Queries[j];
+                for (int t = t0; t <= t1; t++) {
+                    cnt[t]++;
+                    if(ans_g[j] >= TBS){
+                        cntok[t]++;
+                    }
+                }
+            }
+            cout << "T: " << T << '\n';
+            for (int t = 0; t < T; t++) {
+                cout << cntok[t] << '/' << cnt[t] << ' ';
+            }
+            cout << '\n';
+        }
 
         /*for (int j = 0; j < J; j++) {
             cout << weight_factor[j] << ' ';
