@@ -468,7 +468,7 @@ struct Solution {
                 for(int r2 = r + 1; r2 < R; r2++){
                     for(auto &[request_weight, j2] : requests_weights[r2]){
                         if(j == j2){
-                            request_weight *= 0.5;
+                            request_weight *= 0.0001;
                         }
                     }
                 }
