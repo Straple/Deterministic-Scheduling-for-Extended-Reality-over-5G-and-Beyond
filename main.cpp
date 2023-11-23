@@ -423,7 +423,7 @@ struct Solution {
 
                     weight *= exp(-sqrt(TBS) - sqrt(TBS - total_g[j]));
 
-                    for(int j2 : js){
+                    for (int j2: js) {
                         int m = requests[j2].n;
                         if (n != m) {
                             weight *= exp_d_pow[n][m][k][r];
@@ -440,6 +440,7 @@ struct Solution {
         auto calc_sum = [&]() {
             vector<vector<double>> sum_weight(K, vector<double>(R));
             for (auto [weight, n, k, r]: set_of_weights) {
+                ASSERT(weight >= 0, "invalid weight");
                 sum_weight[k][r] += weight;
             }
             return sum_weight;
@@ -484,6 +485,42 @@ struct Solution {
         fix_sum();
         threshold();
         fix_sum();
+
+        // 118.992/150
+        // 146.998/829
+        // 183.995/184
+
+        /*{
+            // а давайте посмотрим на эти веса
+            // возможно кого-то стоит понизить в весе, если мы сейчас ставим этих ребят
+            // возможно кого-то стоит повысить
+
+            vector<tuple<double, int, int, int>> new_set;
+
+            for (auto [weight, n, k, r]: set_of_weights) {
+                double X = weight;
+                for (auto [weight2, m, k2, r2]: set_of_weights) {
+                    if (r == r2 && n != m && k != k2) {
+
+                        double d = s0[t][n][k2][r] * (4 * weight2) / exp_d[n][m][k2][r];
+                        if (d <= 0) {
+                            cout << "FATAL: " << ' ' << s0[t][n][k2][r] << ' ' << (4 * weight2) << ' '
+                                 << exp_d[n][m][k2][r] << endl;
+                            exit(1);
+                        }
+                        d = sqrt(d);
+                        X /= d;
+                    }
+                }
+                new_set.emplace_back(X, n, k, r);
+            }
+            set_of_weights = new_set;
+        }
+
+        fix_sum();
+        threshold();
+        fix_sum();*/
+
 
 #ifdef DEBUG_MODE
         verify();
@@ -649,25 +686,25 @@ int main() {
             ASSERT(false, "what is test case?");
         }
 #endif
-        //std::ios::sync_with_stdio(false);
-        //std::cin.tie(0);
-        //std::cout.tie(0);
+    //std::ios::sync_with_stdio(false);
+    //std::cin.tie(0);
+    //std::cout.tie(0);
 
-        Solution solution;
+    Solution solution;
 #ifdef FAST_STREAM
-        solution.read();
+    solution.read();
 #else
-        solution.read(input);
+    solution.read(input);
 #endif
 
-        solution.solve();
+    solution.solve();
 
 #ifndef FAST_STREAM
-        cout << solution.get_score() << '/' << solution.J << '\n';
+    cout << solution.get_score() << '/' << solution.J << '\n';
 #endif
 
 #ifdef FAST_STREAM
-        solution.print();
+    solution.print();
 #endif
 
 #ifndef FAST_STREAM
