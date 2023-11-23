@@ -272,6 +272,7 @@ struct request_t {
     int n;
     int t0;
     int t1;
+    int ost_len;
 };
 
 struct Solution {
@@ -418,83 +419,88 @@ struct Solution {
     }
 
     vector<tuple<double, int, int, int>> build_weights_of_power(int t, const vector<int> &js) {
-        // requests_weights[r] = {}
-        vector<vector<tuple<double, int>>> requests_weights(R);
-        for (int j: js) {
-            auto [TBS, n, t0, t1] = requests[j];
-            for (int r = 0; r < R; r++) {
-                double weight = 1;
-                ASSERT(total_g[j] < TBS, "failed");
+        // (weight, n, k, r)
+        vector<tuple<double, int, int, int>> set_of_weights;
+        {
+            // requests_weights[r] = {}
+            vector<vector<tuple<double, int>>> requests_weights(R);
+            for (int j: js) {
+                auto [TBS, n, t0, t1, ost_len] = requests[j];
+                for (int r = 0; r < R; r++) {
+                    double weight = 1;
+                    ASSERT(total_g[j] < TBS, "failed");
 
-                for (int k = 0; k < K; k++) {
-                    weight *= s0[t][n][k][r];
+                    weight *= exp(-sqrt(TBS - total_g[j]));
+                    //weight *= (t1 - t0 + 1) * 1.0 / ost_len;
+
+                    for (int k = 0; k < K; k++) {
+                        weight *= s0[t][n][k][r];
+                    }
+
+                    ASSERT(weight >= 0 && !is_spoiled(weight), "invalid weight");
+
+                    requests_weights[r].emplace_back(weight, j);
                 }
 
-                ASSERT(weight >= 0 && !is_spoiled(weight), "invalid weight");
+                /*for (int k = 0; k < K; k++) {
+                    for (int r = 0; r < R; r++) {
+                        double weight = 1;
 
-                requests_weights[r].emplace_back(weight, j);
+                        ASSERT(total_g[j] < TBS, "failed");
+
+                        weight *= exp(-sqrt(TBS) - sqrt(TBS - total_g[j]));
+
+                        for (int j2: js) {
+                            int m = requests[j2].n;
+                            if (n != m) {
+                                weight *= exp_d_pow[n][m][k][r];
+                            }
+                        }
+
+                        ASSERT(weight >= 0 && !is_spoiled(weight), "invalid weight");
+
+                        set_of_weights.emplace_back(weight, n, k, r);
+                    }
+                }*/
             }
 
-            /*for (int k = 0; k < K; k++) {
-                for (int r = 0; r < R; r++) {
+            vector<tuple<double, int>> kek(R);
+            for (int r = 0; r < R; r++) {
+                sort(requests_weights[r].begin(), requests_weights[r].end(), greater<>());
+
+                auto [request_weight, j] = requests_weights[r][0];
+
+                kek[r] = {request_weight, r};
+            }
+            sort(kek.begin(), kek.end(), greater<>());
+            for (auto [_, r]: kek) {
+                sort(requests_weights[r].begin(), requests_weights[r].end(), greater<>());
+
+                auto [__, j] = requests_weights[r][0];
+                // relax other request_weights[r]
+                {
+                    for (int r2 = 0; r2 < R; r2++) {
+                        if (r2 != r) {
+                            for (auto &[request_weight, j2]: requests_weights[r2]) {
+                                if (j == j2) {
+                                    request_weight = 0;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                auto [TBS, n, t0, t1, ost_len] = requests[j];
+
+                for (int k = 0; k < K; k++) {
                     double weight = 1;
 
                     ASSERT(total_g[j] < TBS, "failed");
-
-                    weight *= exp(-sqrt(TBS) - sqrt(TBS - total_g[j]));
-
-                    for (int j2: js) {
-                        int m = requests[j2].n;
-                        if (n != m) {
-                            weight *= exp_d_pow[n][m][k][r];
-                        }
-                    }
 
                     ASSERT(weight >= 0 && !is_spoiled(weight), "invalid weight");
 
                     set_of_weights.emplace_back(weight, n, k, r);
                 }
-            }*/
-        }
-
-        vector<tuple<double, int, int, int>> set_of_weights;
-        for (int r = 0; r < R; r++) {
-            sort(requests_weights[r].begin(), requests_weights[r].end(), greater<>());
-
-            auto [request_weight, j] = requests_weights[r][0];
-
-            // relax other request_weights[r]
-            {
-                for (int r2 = 0; r2 < R; r2++) {
-                    if (r2 != r) {
-                        for (auto &[request_weight, j2]: requests_weights[r2]) {
-                            if (j == j2) {
-                                request_weight = 0;
-                            }
-                        }
-                    }
-                }
-            }
-
-            auto [TBS, n, t0, t1] = requests[j];
-
-            for (int k = 0; k < K; k++) {
-                double weight = 1;
-
-                ASSERT(total_g[j] < TBS, "failed");
-
-                weight *= exp(-sqrt(TBS) - sqrt(TBS - total_g[j]));
-
-                for (int j2: js) {
-                    int m = requests[j2].n;
-                    if (n != m) {
-                        weight *= exp_d_pow[n][m][k][r];
-                    }
-                }
-
-                ASSERT(weight >= 0 && !is_spoiled(weight), "invalid weight");
-
-                set_of_weights.emplace_back(weight, n, k, r);
             }
         }
 
@@ -597,10 +603,13 @@ struct Solution {
     void solve() {
         p.assign(T, vector(N, vector(K, vector<double>(R))));
         total_g.assign(J, 0);
+        for (int j = 0; j < J; j++) {
+            requests[j].ost_len = requests[j].t1 - requests[j].t0 + 1;
+        }
 
         vector<vector<int>> js(T);
         for (int j = 0; j < J; j++) {
-            auto [TBS, n, t0, t1] = requests[j];
+            auto [TBS, n, t0, t1, ost_len] = requests[j];
             for (int t = t0; t <= t1; t++) {
                 js[t].push_back(j);
             }
@@ -632,13 +641,14 @@ struct Solution {
 
             // обновить g
             for (int j: js[best_time]) {
-                auto [TBS, n, t0, t1] = requests[j];
+                auto [TBS, n, t0, t1, ost_len] = requests[j];
                 total_g[j] += get_g(best_time, n);
 
                 if (total_g[j] >= TBS) {
                     // удалим из других
                     for (int t = t0; t <= t1; t++) {
                         if (!js[t].empty() && t != best_time) {
+                            requests[j].ost_len--;
                             auto it = find(js[t].begin(), js[t].end(), j);
                             ASSERT(it != js[t].end(), "fatal");
                             js[t].erase(it);
@@ -647,6 +657,9 @@ struct Solution {
                 }
             }
 
+            for (int j: js[best_time]) {
+                requests[j].ost_len--;
+            }
             js[best_time].clear();
         }
     }
