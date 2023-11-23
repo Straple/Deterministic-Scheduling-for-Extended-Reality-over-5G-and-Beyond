@@ -430,9 +430,7 @@ struct Solution {
                     double weight = 1;
                     ASSERT(total_g[j] < TBS, "failed");
 
-                    weight *= exp(-sqrt(TBS - total_g[j]));
-                    //weight *= (t1 - t0 + 1) * 1.0 / ost_len;
-
+                    weight *= exp(-cbrt(TBS - total_g[j]));
                     for (int k = 0; k < K; k++) {
                         weight *= s0[t][n][k][r];
                     }
