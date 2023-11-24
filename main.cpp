@@ -295,10 +295,17 @@ struct Solution {
     vector<vector<vector<vector<double>>>> exp_d_pow;
 
     vector<request_t> requests;
+    vector<bool> used_request;
+    // count_of_set_r_for_request[j]
+    vector<int> count_of_set_r_for_request;
 
     vector<vector<vector<vector<double>>>> p;
 
+    // total_g[j]
     vector<double> total_g;
+
+    // add_g[t][n]
+    vector<vector<double>> add_g;
 
     void read(
 #ifndef FAST_STREAM
@@ -403,9 +410,20 @@ struct Solution {
     }
 
     void set_power(int t, const vector<tuple<double, int, int, int>> &set_of_weights) {
+#ifdef DEBUG_MODE
+        vector<set<int>> kek(R);
+#endif
         for (auto [weight, n, k, r]: set_of_weights) {
             p[t][n][k][r] = weight * 4;
+#ifdef DEBUG_MODE
+            kek[r].insert(n);
+#endif
         }
+#ifdef DEBUG_MODE
+        for (int r = 0; r < R; r++) {
+            ASSERT(kek[r].size() <= 1, "why many requests in one r?");
+        }
+#endif
 
         vector<double> sum(K);
         for (auto [weight, n, k, r]: set_of_weights) {
@@ -437,29 +455,9 @@ struct Solution {
 
                     ASSERT(weight >= 0 && !is_spoiled(weight), "invalid weight");
 
+                    weight += 1e3;
                     requests_weights[r].emplace_back(weight, j);
                 }
-
-                /*for (int k = 0; k < K; k++) {
-                    for (int r = 0; r < R; r++) {
-                        double weight = 1;
-
-                        ASSERT(total_g[j] < TBS, "failed");
-
-                        weight *= exp(-sqrt(TBS) - sqrt(TBS - total_g[j]));
-
-                        for (int j2: js) {
-                            int m = requests[j2].n;
-                            if (n != m) {
-                                weight *= exp_d_pow[n][m][k][r];
-                            }
-                        }
-
-                        ASSERT(weight >= 0 && !is_spoiled(weight), "invalid weight");
-
-                        set_of_weights.emplace_back(weight, n, k, r);
-                    }
-                }*/
             }
 
             vector<tuple<double, int>> kek(R);
@@ -481,12 +479,15 @@ struct Solution {
                         if (r2 != r) {
                             for (auto &[request_weight, j2]: requests_weights[r2]) {
                                 if (j == j2) {
-                                    request_weight = 0;
+                                    request_weight /= 1e50;
                                 }
                             }
                         }
                     }
                 }
+
+                count_of_set_r_for_request[j]++;
+                // cout << count_of_set_r_for_request[j] << '\n';
 
                 auto [TBS, n, t0, t1, ost_len] = requests[j];
 
@@ -548,8 +549,8 @@ struct Solution {
         };
 
         fix_sum();
-        threshold();
-        fix_sum();
+        //threshold();
+        //fix_sum();
 
         /*{
             // а давайте посмотрим на эти веса
@@ -598,20 +599,53 @@ struct Solution {
         set_power(t, build_weights_of_power(t, js));
     }
 
+    void set_zero_power(int j, vector<vector<int>> &js) {
+        auto [TBS, n, t0, t1, ost_len] = requests[j];
+        for (int t = t0; t <= t1; t++) {
+            for (int k = 0; k < K; k++) {
+                for (int r = 0; r < R; r++) {
+                    p[t][n][k][r] = 0;
+                }
+            }
+            for (int j2: js[t]) {
+                int m = requests[j2].n;
+                total_g[j2] -= add_g[t][m];
+                add_g[t][m] = get_g(t, m);
+                total_g[j2] += add_g[t][m];
+            }
+        }
+    }
+
     void solve() {
         p.assign(T, vector(N, vector(K, vector<double>(R))));
         total_g.assign(J, 0);
+        add_g.assign(T, vector<double>(N));
+        count_of_set_r_for_request.assign(J, 0);
         for (int j = 0; j < J; j++) {
             requests[j].ost_len = requests[j].t1 - requests[j].t0 + 1;
         }
 
         vector<vector<int>> js(T);
         for (int j = 0; j < J; j++) {
-            auto [TBS, n, t0, t1, ost_len] = requests[j];
-            for (int t = t0; t <= t1; t++) {
-                js[t].push_back(j);
+            if (used_request[j]) {
+                auto [TBS, n, t0, t1, ost_len] = requests[j];
+                for (int t = t0; t <= t1; t++) {
+                    js[t].push_back(j);
+                }
             }
         }
+
+        auto verify_ost_len = [&](int j) {
+#ifdef DEBUG_MODE
+            auto [TBS, n, t0, t1, ost_len] = requests[j];
+            int count = 0;
+            for (int t = t0; t <= t1; t++) {
+                count += find(js[t].begin(), js[t].end(), j) != js[t].end();
+            }
+            //cout << count << ' ' << ost_len << endl;
+            ASSERT(count == ost_len, "failed calculating ost_len");
+#endif
+        };
 
         for (int step = 0; step < T; step++) {
             // выберем самое лучшее время, куда наиболее оптимально поставим силу
@@ -639,8 +673,16 @@ struct Solution {
 
             // обновить g
             for (int j: js[best_time]) {
+                verify_ost_len(j);
+
                 auto [TBS, n, t0, t1, ost_len] = requests[j];
-                total_g[j] += get_g(best_time, n);
+                add_g[best_time][n] = get_g(best_time, n);
+                total_g[j] += add_g[best_time][n];
+            }
+
+            // remove accepted
+            for (int j: js[best_time]) {
+                auto [TBS, n, t0, t1, ost_len] = requests[j];
 
                 if (total_g[j] >= TBS) {
                     // удалим из других
@@ -655,10 +697,37 @@ struct Solution {
                 }
             }
 
+            // TODO: если мы не смогли отправить сообщение
+            // то посмотрим на таких. возьмем того, у кого прям вообще не получилось
+            // этот чел занимал r, которую мы могли бы дать другим и улучшить их score
+            // давайте так и сделаем
+
+            /*vector<tuple<double, int>> need_set_zero;
             for (int j: js[best_time]) {
-                requests[j].ost_len--;
+                if (total_g[j] < requests[j].TBS && requests[j].ost_len == 0) {
+                    need_set_zero.emplace_back(total_g[j], j);
+                }
             }
-            js[best_time].clear();
+            sort(need_set_zero.begin(), need_set_zero.end(), greater<>());
+            for (auto [weight, j]: need_set_zero) {
+                if (total_g[j] < requests[j].TBS) {
+
+                }
+            }
+
+            for (int j: js[best_time]) {
+                auto [TBS, n, t0, t1, ost_len] = requests[j];
+            }*/
+
+            // clear
+            {
+                for (int j: js[best_time]) {
+                    verify_ost_len(j);
+                    requests[j].ost_len--;
+                }
+
+                js[best_time].clear();
+            }
         }
     }
 
@@ -737,14 +806,38 @@ struct Solution {
         ASSERT(sum >= 0 && !is_spoiled(sum), "invalid g");
         return 192 * sum;
     }
+
+    bool remove_bad_request() {
+        auto f = [&](int j) {
+            return -count_of_set_r_for_request[j] * 10000 + (requests[j].TBS - total_g[j]);
+        };
+        int best_j = -1;
+
+        for (int j = 0; j < J; j++) {
+            if (used_request[j] && total_g[j] < requests[j].TBS) {
+                // bad request
+                if (best_j == -1 || f(j) < f(best_j)) {
+                    best_j = j;
+                }
+            }
+        }
+        if (best_j == -1) {
+            return false;
+        }
+        // remove this request [best_j]
+        used_request[best_j] = false;
+        return true;
+    }
 };
 
 int main() {
 #ifndef FAST_STREAM
-    for (int test_case = 1; test_case <= 3; test_case++) {
+    for (int test_case = 0; test_case <= 3; test_case++) {
 
         std::ifstream input("input.txt");
-        if (test_case == 1) {
+        if (test_case == 0) {
+            input = std::ifstream("input.txt");
+        } else if (test_case == 1) {
             input = std::ifstream("6");
         } else if (test_case == 2) {
             input = std::ifstream("21");
@@ -753,26 +846,37 @@ int main() {
         } else {
             ASSERT(false, "what is test case?");
         }
+        cout << "TEST CASE==============\n";
 #endif
-    //std::ios::sync_with_stdio(false);
-    //std::cin.tie(0);
-    //std::cout.tie(0);
+        //std::ios::sync_with_stdio(false);
+        //std::cin.tie(0);
+        //std::cout.tie(0);
 
-    Solution solution;
+        Solution solution;
 #ifdef FAST_STREAM
-    solution.read();
+        solution.read();
 #else
-    solution.read(input);
+        solution.read(input);
 #endif
 
-    solution.solve();
+        solution.used_request.assign(solution.J, true);
+        solution.solve();
+        /*while (true) {
+            solution.solve();
+    #ifndef FAST_STREAM
+            cout << solution.get_score() << '/' << solution.J << '\n';
+    #endif
+            if (!solution.remove_bad_request()) {
+                break;
+            }
+        }*/
 
 #ifndef FAST_STREAM
-    cout << solution.get_score() << '/' << solution.J << '\n';
+        cout << solution.get_score() << '/' << solution.J << '\n';
 #endif
 
 #ifdef FAST_STREAM
-    solution.print();
+        solution.print();
 #endif
 
 #ifndef FAST_STREAM
