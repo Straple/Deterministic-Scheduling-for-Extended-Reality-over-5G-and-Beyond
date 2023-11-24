@@ -242,7 +242,7 @@ bool is_spoiled(double num) {
     return std::isnan(num) || std::isinf(num);
 }
 
-#define FAST_STREAM
+//#define FAST_STREAM
 
 #define DEBUG_MODE
 
@@ -749,7 +749,7 @@ struct Solution {
         return X - 1e-6 * power_sum;
     }
 
-    double get_g(int t, int n) {
+    double correct_get_g(int t, int n) {
         vector<vector<double>> dp_s0_p_d(K, vector<double>(R));
 
         // update dp_s0_p_d
@@ -804,6 +804,40 @@ struct Solution {
             sum += count * log2(1 + pow(accum_prod, 1.0 / count));
         }
         ASSERT(sum >= 0 && !is_spoiled(sum), "invalid g");
+        return 192 * sum;
+    }
+
+    double get_g(int t, int n) {
+/*
+TEST CASE==============
+0.999996/2
+TEST CASE==============
+144.993/150
+TEST CASE==============
+475.998/829
+TEST CASE==============
+183.995/184
+*/
+        double sum = 0;
+        for (int k = 0; k < K; k++) {
+            double accum_prod = 1;
+            int count = 0;
+            //cout << "lol: ";
+            for (int r = 0; r < R; r++) {
+                if (p[t][n][k][r] > 0) {
+//                    cout << p[t][n][k][r] << ' ';
+                    count++;
+                    accum_prod *= p[t][n][k][r];
+                    accum_prod *= s0[t][n][k][r];
+                }
+            }
+            //          cout << endl;
+
+            sum += count * log2(1 + pow(accum_prod, 1.0 / count));
+            //cout << "kek: " << accum_prod << ' ' << count << endl;
+        }
+        ASSERT(sum >= 0 && !is_spoiled(sum), "invalid g");
+        ASSERT(correct_get_g(t, n) == 192 * sum, "failed calc");
         return 192 * sum;
     }
 
