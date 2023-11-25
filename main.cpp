@@ -236,6 +236,59 @@ namespace KopeliovichStream {
 
 }
 
+/// test J
+/// 1 2
+/// 2 266
+/// 3 497
+/// 4 800
+/// 5 356
+/// 6 150
+/// 7 120
+/// 8 160
+/// 9 709
+/// 10 180
+/// 11 255
+/// 12 380
+/// 13 80
+/// 14 821
+/// 15 185
+/// 16 571
+/// 17 354
+/// 18 150
+/// 19 120
+/// 20 160
+/// 21 829
+/// 22 181
+/// 23 127
+/// 24 255
+/// 25 80
+/// 26 837
+/// 27 184
+/// 28 282
+/// 29 355
+/// 30 150
+/// 31 120
+/// 32 160
+/// 33 1654
+/// 34 181
+/// 35 254
+/// 36 250
+/// 37 80
+/// 38 1657
+/// 39 185
+/// 40 805
+/// 41 358
+/// 42 150
+/// 43 120
+/// 44 160
+/// 45 834
+/// 46 182
+/// 47 255
+/// 48 380
+/// 49 80
+/// 50 825
+/// 51 184
+
 using namespace KopeliovichStream;
 
 bool is_spoiled(double num) {
@@ -612,78 +665,7 @@ struct Solution {
 
         set_power(t, build_weights_of_power(t, js));
 
-        // TODO: доделать это
-        // с использованием imaginary g
-        /*vector<bool> used(R, false);
-        for(int step = 0; step < R; step++){
-            // R раз будем делать оптимальные шаги по заполнению силы
-
-            // requests_weights[r] = {}
-            vector<vector<tuple<double, int>>> requests_weights(R);
-            for (int j: js) {
-                auto [TBS, n, t0, t1, ost_len] = requests[j];
-                for (int r = 0; r < R; r++) {
-                    if(used[r]) {
-                        double weight = 1;
-                        ASSERT(total_g[j] < TBS, "failed");
-
-                        weight *= exp(-cbrt(TBS - total_g[j]));
-                        for (int k = 0; k < K; k++) {
-                            weight *= s0[t][n][k][r];
-                        }
-
-                        ASSERT(weight >= 0 && !is_spoiled(weight), "invalid weight");
-
-                        requests_weights[r].emplace_back(weight, j);
-                    }
-                }
-            }
-
-            vector<tuple<double, int>> kek(R);
-            for (int r = 0; r < R; r++) {
-                sort(requests_weights[r].begin(), requests_weights[r].end(), greater<>());
-
-                auto [request_weight, j] = requests_weights[r][0];
-
-                kek[r] = {request_weight, r};
-            }
-            sort(kek.begin(), kek.end(), greater<>());
-            for (auto [_, r]: kek) {
-                sort(requests_weights[r].begin(), requests_weights[r].end(), greater<>());
-
-                auto [__, j] = requests_weights[r][0];
-                // relax other request_weights[r]
-                {
-                    for (int r2 = 0; r2 < R; r2++) {
-                        if (r2 != r) {
-                            for (auto &[request_weight, j2]: requests_weights[r2]) {
-                                if (j == j2) {
-                                    request_weight /= 1e50;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                count_of_set_r_for_request[j]++;
-                // cout << count_of_set_r_for_request[j] << '\n';
-
-                auto [TBS, n, t0, t1, ost_len] = requests[j];
-
-                for (int k = 0; k < K; k++) {
-                    double weight = 1;
-
-                    ASSERT(total_g[j] < TBS, "failed");
-
-                    weight = 30 - log(1 + TBS);//+ log(1 + total_g[j]);
-
-                    //cout << weight << endl;
-                    ASSERT(weight >= 0 && !is_spoiled(weight), "invalid weight");
-
-                    set_of_weights.emplace_back(weight, n, k, r);
-                }
-            }
-        }*/
+        // для каждого r выберем
     }
 
     void set_zero_power(int j, vector<vector<int>> &js) {
@@ -983,17 +965,17 @@ int main() {
 #endif
     solution.used_request.assign(solution.J, true);
 
-    Solution solution2 = solution;
+    //Solution solution2 = solution;
 
-    solution2.use_build_weight_version = Solution::ONCE_IN_R;
-    solution.use_build_weight_version = Solution::ALL;
+    //solution2.use_build_weight_version = Solution::ONCE_IN_R;
+    solution.use_build_weight_version = Solution::ONCE_IN_R;
 
     solution.solve();
-    solution2.solve();
+    /*solution2.solve();
 
     if (solution.get_score() < solution2.get_score()) {
         solution = solution2;
-    }
+    }*/
 
     /*while (true) {
         solution.solve();
