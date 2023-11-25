@@ -409,12 +409,12 @@ struct Solution {
         }
     }
 
-    void set_power(int t, const vector<tuple<double, int, int, int>> &set_of_weights) {
+    void set_power(int t, vector<tuple<double, int, int, int>> set_of_weights) {
 #ifdef DEBUG_MODE
         vector<set<int>> kek(R);
 #endif
         for (auto [weight, n, k, r]: set_of_weights) {
-            p[t][n][k][r] = weight * 4;
+            p[t][n][k][r] = min(4.0, weight * R);
 #ifdef DEBUG_MODE
             kek[r].insert(n);
 #endif
@@ -425,7 +425,7 @@ struct Solution {
         }
 #endif
 
-        vector<double> sum(K);
+        /*vector<double> sum(K);
         for (auto [weight, n, k, r]: set_of_weights) {
             sum[k] += p[t][n][k][r];
         }
@@ -433,7 +433,7 @@ struct Solution {
             if (sum[k] > 1e-9) {
                 p[t][n][k][r] *= min(1.0, R / sum[k]);
             }
-        }
+        }*/
     }
 
     vector<tuple<double, int, int, int>> build_weights_of_power(int t, const vector<int> &js) {
@@ -455,35 +455,38 @@ struct Solution {
 
                     ASSERT(weight >= 0 && !is_spoiled(weight), "invalid weight");
 
-                    weight += 1e3;
                     requests_weights[r].emplace_back(weight, j);
                 }
             }
 
-            vector<tuple<double, int>> kek(R);
+            // (weight, r, j)
+            set<tuple<double, int, int>, greater<>> S;
             for (int r = 0; r < R; r++) {
-                sort(requests_weights[r].begin(), requests_weights[r].end(), greater<>());
-
-                auto [request_weight, j] = requests_weights[r][0];
-
-                kek[r] = {request_weight, r};
+                for (auto [weight, j]: requests_weights[r]) {
+                    S.insert({weight, r, j});
+                }
             }
-            sort(kek.begin(), kek.end(), greater<>());
-            for (auto [_, r]: kek) {
-                sort(requests_weights[r].begin(), requests_weights[r].end(), greater<>());
+            vector<bool> used(R, false);
+            while (!S.empty()) {
+                //cout << S.size() << endl;
+                auto [weight, r, j] = *S.begin();
+                S.erase(S.begin());
+                if (used[r]) {
+                    continue;
+                }
+                used[r] = true;
 
-                auto [__, j] = requests_weights[r][0];
-                // relax other request_weights[r]
+                // relax others
                 {
-                    for (int r2 = 0; r2 < R; r2++) {
-                        if (r2 != r) {
-                            for (auto &[request_weight, j2]: requests_weights[r2]) {
-                                if (j == j2) {
-                                    request_weight /= 1e50;
-                                }
-                            }
+                    set<tuple<double, int, int>, greater<>> new_S;
+                    for (auto [weight2, r2, j2]: S) {
+                        if (j == j2) {
+                            new_S.insert({log(1 + weight2), r2, j2});
+                        } else {
+                            new_S.insert({weight2, r2, j2});
                         }
                     }
+                    S = new_S;
                 }
 
                 count_of_set_r_for_request[j]++;
@@ -496,6 +499,9 @@ struct Solution {
 
                     ASSERT(total_g[j] < TBS, "failed");
 
+                    //weight = 30 - log(1 + TBS);//+ log(1 + total_g[j]);
+
+                    //cout << weight << endl;
                     ASSERT(weight >= 0 && !is_spoiled(weight), "invalid weight");
 
                     set_of_weights.emplace_back(weight, n, k, r);
@@ -504,10 +510,10 @@ struct Solution {
         }
 
         auto calc_sum = [&]() {
-            vector<vector<double>> sum_weight(K, vector<double>(R));
+            vector<double> sum_weight(K);
             for (auto [weight, n, k, r]: set_of_weights) {
                 ASSERT(weight >= 0, "invalid weight");
-                sum_weight[k][r] += weight;
+                sum_weight[k] += weight;
             }
             return sum_weight;
         };
@@ -517,8 +523,8 @@ struct Solution {
 
             for (auto &[weight, n, k, r]: set_of_weights) {
                 //ASSERT(sum_weight[k][r] == 0 || sum_weight[k][r] > 1e-9, "very small sum_weight");
-                if (sum_weight[k][r] != 0) {
-                    weight = weight / sum_weight[k][r];
+                if (sum_weight[k] != 0) {
+                    weight = weight / sum_weight[k];
                 } else {
                     weight = 0;
                 }
@@ -542,9 +548,8 @@ struct Solution {
             }
             auto sum_weight = calc_sum();
             for (int k = 0; k < K; k++) {
-                for (int r = 0; r < R; r++) {
-                    ASSERT(sum_weight[k][r] == 0 || abs(sum_weight[k][r] - 1) < 1e-9, "invalid sum_weight");
-                }
+                ASSERT(sum_weight[k] == 0 || abs(sum_weight[k] - 1) < 1e-9, "invalid sum_weight");
+
             }
         };
 
@@ -597,6 +602,79 @@ struct Solution {
         // а также чтобы доотправлять сообщения
 
         set_power(t, build_weights_of_power(t, js));
+
+        // TODO: доделать это
+        // с использованием imaginary g
+        /*vector<bool> used(R, false);
+        for(int step = 0; step < R; step++){
+            // R раз будем делать оптимальные шаги по заполнению силы
+
+            // requests_weights[r] = {}
+            vector<vector<tuple<double, int>>> requests_weights(R);
+            for (int j: js) {
+                auto [TBS, n, t0, t1, ost_len] = requests[j];
+                for (int r = 0; r < R; r++) {
+                    if(used[r]) {
+                        double weight = 1;
+                        ASSERT(total_g[j] < TBS, "failed");
+
+                        weight *= exp(-cbrt(TBS - total_g[j]));
+                        for (int k = 0; k < K; k++) {
+                            weight *= s0[t][n][k][r];
+                        }
+
+                        ASSERT(weight >= 0 && !is_spoiled(weight), "invalid weight");
+
+                        requests_weights[r].emplace_back(weight, j);
+                    }
+                }
+            }
+
+            vector<tuple<double, int>> kek(R);
+            for (int r = 0; r < R; r++) {
+                sort(requests_weights[r].begin(), requests_weights[r].end(), greater<>());
+
+                auto [request_weight, j] = requests_weights[r][0];
+
+                kek[r] = {request_weight, r};
+            }
+            sort(kek.begin(), kek.end(), greater<>());
+            for (auto [_, r]: kek) {
+                sort(requests_weights[r].begin(), requests_weights[r].end(), greater<>());
+
+                auto [__, j] = requests_weights[r][0];
+                // relax other request_weights[r]
+                {
+                    for (int r2 = 0; r2 < R; r2++) {
+                        if (r2 != r) {
+                            for (auto &[request_weight, j2]: requests_weights[r2]) {
+                                if (j == j2) {
+                                    request_weight /= 1e50;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                count_of_set_r_for_request[j]++;
+                // cout << count_of_set_r_for_request[j] << '\n';
+
+                auto [TBS, n, t0, t1, ost_len] = requests[j];
+
+                for (int k = 0; k < K; k++) {
+                    double weight = 1;
+
+                    ASSERT(total_g[j] < TBS, "failed");
+
+                    weight = 30 - log(1 + TBS);//+ log(1 + total_g[j]);
+
+                    //cout << weight << endl;
+                    ASSERT(weight >= 0 && !is_spoiled(weight), "invalid weight");
+
+                    set_of_weights.emplace_back(weight, n, k, r);
+                }
+            }
+        }*/
     }
 
     void set_zero_power(int j, vector<vector<int>> &js) {
@@ -825,13 +903,14 @@ TEST CASE==============
             //cout << "lol: ";
             for (int r = 0; r < R; r++) {
                 if (p[t][n][k][r] > 0) {
-//                    cout << p[t][n][k][r] << ' ';
+                    //cout << p[t][n][k][r] << ' ';
                     count++;
                     accum_prod *= p[t][n][k][r];
                     accum_prod *= s0[t][n][k][r];
+                    //ASSERT(p[t][n][k][r] == 1, "failed");
                 }
             }
-            //          cout << endl;
+            //cout << endl;
 
             sum += count * log2(1 + pow(accum_prod, 1.0 / count));
             //cout << "kek: " << accum_prod << ' ' << count << endl;
