@@ -242,7 +242,7 @@ bool is_spoiled(double num) {
     return std::isnan(num) || std::isinf(num);
 }
 
-//#define FAST_STREAM
+#define FAST_STREAM
 
 #define DEBUG_MODE
 
@@ -281,6 +281,11 @@ struct Solution {
     int T;
     int R;
     int J;
+
+    enum build_weights_version {
+        ALL,
+        ONCE_IN_R,
+    } use_build_weight_version = ALL;
 
     // s0[t][n][k][r]
     vector<vector<vector<vector<double>>>> s0;
@@ -410,36 +415,30 @@ struct Solution {
     }
 
     void set_power(int t, vector<tuple<double, int, int, int>> set_of_weights) {
-#ifdef DEBUG_MODE
-        vector<set<int>> kek(R);
-#endif
-        for (auto [weight, n, k, r]: set_of_weights) {
-            p[t][n][k][r] = min(4.0, weight * R);
-#ifdef DEBUG_MODE
-            kek[r].insert(n);
-#endif
-        }
-#ifdef DEBUG_MODE
-        for (int r = 0; r < R; r++) {
-            ASSERT(kek[r].size() <= 1, "why many requests in one r?");
-        }
-#endif
-
-        /*vector<double> sum(K);
-        for (auto [weight, n, k, r]: set_of_weights) {
-            sum[k] += p[t][n][k][r];
-        }
-        for (auto [weight, n, k, r]: set_of_weights) {
-            if (sum[k] > 1e-9) {
-                p[t][n][k][r] *= min(1.0, R / sum[k]);
+        if (use_build_weight_version == ONCE_IN_R) {
+            for (auto [weight, n, k, r]: set_of_weights) {
+                p[t][n][k][r] = min(4.0, weight * R);
             }
-        }*/
+        } else {
+            for (auto [weight, n, k, r]: set_of_weights) {
+                p[t][n][k][r] = 4 * weight;
+            }
+            vector<double> sum(K);
+            for (auto [weight, n, k, r]: set_of_weights) {
+                sum[k] += p[t][n][k][r];
+            }
+            for (auto [weight, n, k, r]: set_of_weights) {
+                if (sum[k] > 1e-9) {
+                    p[t][n][k][r] *= min(1.0, R / sum[k]);
+                }
+            }
+        }
     }
 
     vector<tuple<double, int, int, int>> build_weights_of_power(int t, const vector<int> &js) {
         // (weight, n, k, r)
         vector<tuple<double, int, int, int>> set_of_weights;
-        {
+        if (use_build_weight_version == ONCE_IN_R) {
             // requests_weights[r] = {}
             vector<vector<tuple<double, int>>> requests_weights(R);
             for (int j: js) {
@@ -507,6 +506,28 @@ struct Solution {
                     set_of_weights.emplace_back(weight, n, k, r);
                 }
             }
+        } else if (use_build_weight_version == ALL) {
+            for (int j: js) {
+                auto [TBS, n, t0, t1, ost_len] = requests[j];
+
+                for (int k = 0; k < K; k++) {
+                    for (int r = 0; r < R; r++) {
+                        double weight = 1;
+                        for (int j2: js) {
+                            int m = requests[j2].n;
+                            if (n != m) {
+                                weight *= pow(exp_d[n][m][k][r], 3);
+                            }
+                        }
+
+                        ASSERT(weight >= 0 && !is_spoiled(weight), "invalid weight");
+
+                        set_of_weights.emplace_back(weight, n, k, r);
+                    }
+                }
+            }
+        } else {
+            ASSERT(false, "invalid build weights version");
         }
 
         auto calc_sum = [&]() {
@@ -518,15 +539,35 @@ struct Solution {
             return sum_weight;
         };
 
-        auto fix_sum = [&]() {
-            auto sum_weight = calc_sum();
+        auto calc_sum2 = [&]() {
+            vector<vector<double>> sum_weight(K, vector<double>(R));
+            for (auto [weight, n, k, r]: set_of_weights) {
+                ASSERT(weight >= 0, "invalid weight");
+                sum_weight[k][r] += weight;
+            }
+            return sum_weight;
+        };
 
-            for (auto &[weight, n, k, r]: set_of_weights) {
-                //ASSERT(sum_weight[k][r] == 0 || sum_weight[k][r] > 1e-9, "very small sum_weight");
-                if (sum_weight[k] != 0) {
-                    weight = weight / sum_weight[k];
-                } else {
-                    weight = 0;
+        auto fix_sum = [&]() {
+            if (use_build_weight_version == ONCE_IN_R) {
+                auto sum_weight = calc_sum();
+
+                for (auto &[weight, n, k, r]: set_of_weights) {
+                    if (sum_weight[k] != 0) {
+                        weight = weight / sum_weight[k];
+                    } else {
+                        weight = 0;
+                    }
+                }
+            } else {
+                auto sum_weight = calc_sum2();
+
+                for (auto &[weight, n, k, r]: set_of_weights) {
+                    if (sum_weight[k][r] != 0) {
+                        weight = weight / sum_weight[k][r];
+                    } else {
+                        weight = 0;
+                    }
                 }
             }
         };
@@ -554,44 +595,12 @@ struct Solution {
         };
 
         fix_sum();
-        //threshold();
-        //fix_sum();
-
-        /*{
-            // а давайте посмотрим на эти веса
-            // возможно кого-то стоит понизить в весе, если мы сейчас ставим этих ребят
-            // возможно кого-то стоит повысить
-
-            vector<tuple<double, int, int, int>> new_set;
-
-            for (auto [weight, n, k, r]: set_of_weights) {
-                double X = weight;
-                for (auto [weight2, m, k2, r2]: set_of_weights) {
-                    if (r == r2 && n != m && k != k2) {
-
-                        double d = s0[t][n][k2][r] * (4 * weight2) / exp_d[n][m][k2][r];
-                        if (d <= 0) {
-                            cout << "FATAL: " << ' ' << s0[t][n][k2][r] << ' ' << (4 * weight2) << ' '
-                                 << exp_d[n][m][k2][r] << endl;
-                            exit(1);
-                        }
-                        d = sqrt(d);
-                        X /= d;
-                    }
-                }
-                new_set.emplace_back(X, n, k, r);
-            }
-            set_of_weights = new_set;
-        }
-
-        fix_sum();
         threshold();
-        fix_sum();*/
+        fix_sum();
 
-
-#ifdef DEBUG_MODE
+/*#ifdef DEBUG_MODE
         verify();
-#endif
+#endif*/
 
         return set_of_weights;
     }
@@ -886,6 +895,7 @@ struct Solution {
     }
 
     double get_g(int t, int n) {
+        return correct_get_g(t, n);
 /*
 TEST CASE==============
 0.999996/2
@@ -971,9 +981,20 @@ int main() {
 #else
     solution.read(input);
 #endif
-
     solution.used_request.assign(solution.J, true);
+
+    Solution solution2 = solution;
+
+    solution2.use_build_weight_version = Solution::ONCE_IN_R;
+    solution.use_build_weight_version = Solution::ALL;
+
     solution.solve();
+    solution2.solve();
+
+    if (solution.get_score() < solution2.get_score()) {
+        solution = solution2;
+    }
+
     /*while (true) {
         solution.solve();
 #ifndef FAST_STREAM
