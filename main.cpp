@@ -481,7 +481,7 @@ struct Solution {
                     set<tuple<double, int, int>, greater<>> new_S;
                     for (auto [weight2, r2, j2]: S) {
                         if (j == j2) {
-                            new_S.insert({log(1 + weight2), r2, j2});
+                            new_S.insert({weight2 / 1e40, r2, j2});
                         } else {
                             new_S.insert({weight2, r2, j2});
                         }
@@ -961,35 +961,35 @@ int main() {
         }
         cout << "TEST CASE==============\n";
 #endif
-        //std::ios::sync_with_stdio(false);
-        //std::cin.tie(0);
-        //std::cout.tie(0);
+    //std::ios::sync_with_stdio(false);
+    //std::cin.tie(0);
+    //std::cout.tie(0);
 
-        Solution solution;
+    Solution solution;
 #ifdef FAST_STREAM
-        solution.read();
+    solution.read();
 #else
-        solution.read(input);
+    solution.read(input);
 #endif
 
-        solution.used_request.assign(solution.J, true);
+    solution.used_request.assign(solution.J, true);
+    solution.solve();
+    /*while (true) {
         solution.solve();
-        /*while (true) {
-            solution.solve();
-    #ifndef FAST_STREAM
-            cout << solution.get_score() << '/' << solution.J << '\n';
-    #endif
-            if (!solution.remove_bad_request()) {
-                break;
-            }
-        }*/
-
 #ifndef FAST_STREAM
         cout << solution.get_score() << '/' << solution.J << '\n';
 #endif
+        if (!solution.remove_bad_request()) {
+            break;
+        }
+    }*/
+
+#ifndef FAST_STREAM
+    cout << solution.get_score() << '/' << solution.J << '\n';
+#endif
 
 #ifdef FAST_STREAM
-        solution.print();
+    solution.print();
 #endif
 
 #ifndef FAST_STREAM
