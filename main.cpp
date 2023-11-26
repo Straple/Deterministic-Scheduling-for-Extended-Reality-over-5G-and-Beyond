@@ -295,7 +295,9 @@ bool is_spoiled(double num) {
     return std::isnan(num) || std::isinf(num);
 }
 
-//#define FAST_STREAM
+#define FAST_STREAM
+
+//#define PRINT_DEBUG_INFO
 
 #define DEBUG_MODE
 
@@ -357,6 +359,7 @@ struct Solution {
     // count_of_set_r_for_request[j]
     vector<int> count_of_set_r_for_request;
 
+    // p[t][n][k][r]
     vector<vector<vector<vector<double>>>> p;
 
     // total_g[j]
@@ -464,6 +467,158 @@ struct Solution {
 #endif
                 }
             }
+        }
+    }
+
+    vector<vector<double>> power_snapshot(int t, int n) {
+        vector<vector<double>> save_p(K, vector<double>(R));
+        for (int k = 0; k < K; k++) {
+            for (int r = 0; r < R; r++) {
+                save_p[k][r] = p[t][n][k][r];
+            }
+        }
+        return save_p;
+    }
+
+    void set_power(int t, int n, const vector<vector<double>> &power) {
+        for (int k = 0; k < K; k++) {
+            for (int r = 0; r < R; r++) {
+                p[t][n][k][r] = power[k][r];
+            }
+        }
+    }
+
+    void mult_power(int t, int n, double factor) {
+        for (int k = 0; k < K; k++) {
+            for (int r = 0; r < R; r++) {
+                p[t][n][k][r] *= factor;
+            }
+        }
+    }
+
+    double calc_g_with_power_factor(int t, int n, double factor) {
+        auto old_power = power_snapshot(t, n);
+        mult_power(t, n, factor);
+        double g = get_g(t, n);
+        set_power(t, n, old_power);
+        return g;
+    }
+
+    bool verify_mult_power(int t, int n, double factor) {
+        vector<double> sum(K);
+        for (int m = 0; m < N; m++) {
+            for (int k = 0; k < K; k++) {
+                for (int r = 0; r < R; r++) {
+                    if (m != n) {
+                        sum[k] += p[t][m][k][r];
+                    } else {
+                        sum[k] += factor * p[t][m][k][r];
+                    }
+                }
+            }
+        }
+        for (int k = 0; k < K; k++) {
+            if (sum[k] > R) {
+                return false;
+            }
+        }
+        for (int k = 0; k < K; k++) {
+            for (int r = 0; r < R; r++) {
+                double sum = 0;
+                for (int m = 0; m < N; m++) {
+                    if (m != n) {
+                        sum += p[t][m][k][r];
+                    } else {
+                        sum += factor * p[t][m][k][r];
+                    }
+                }
+                if (sum > 4) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    // если этот запрос отправлен, то эта функция минимизирует количество затраченной силы для этого,
+    // чтобы дать возможность другим запросам пользоваться большей силой
+    /// !вызывать до обновления total_g[j]!
+    void minimize_power(int t, int j) {
+        auto [TBS, n, t0, t1, ost_len] = requests[j];
+        double add_g = get_g(t, n);
+        if (add_g + total_g[j] >= TBS + 1e-1) {
+#ifdef PRINT_DEBUG_INFO
+            cout << "minimize_power(" << TBS << ") " << add_g + total_g[j] << "->";
+#endif
+
+            double tl = 0, tr = 1;
+            while (tl < tr - 1e-3) {
+                double tm = (tl + tr) / 2;
+                if (calc_g_with_power_factor(t, n, tm) + total_g[j] >= TBS) {
+                    tr = tm;
+                } else {
+                    tl = tm;
+                }
+            }
+            double good_factor = tr;
+            mult_power(t, n, tr);
+#ifdef PRINT_DEBUG_INFO
+            cout << total_g[j] + get_g(t, n) << endl;
+#endif
+        }
+    }
+
+    double sum_power(int t, int n) {
+        double sum = 0;
+        for (int k = 0; k < K; k++) {
+            for (int r = 0; r < R; r++) {
+                sum += p[t][n][k][r];
+            }
+        }
+        return sum;
+    }
+
+    // если сообщение не отправлено
+    // то вернет множитель силы, на который нужно домножить
+    // чтобы отправить это сообщение
+    // либо 0
+    double calc_power_factor_for_accept_request(int t, int j) {
+        auto [TBS, n, t0, t1, ost_len] = requests[j];
+
+        // этот запрос не используется
+        if (sum_power(t, n) == 0) {
+            return 0;
+        }
+
+#ifdef PRINT_DEBUG_INFO
+        cout << "more_power(" << TBS << ") " << get_g(t, n) + total_g[j] << "->";
+#endif
+
+        double tl = 0, tr = 1e9;
+        while (tl < tr - 1e-3) {
+            double tm = (tl + tr) / 2;
+            // TODO: это сделает неточным good_factor=tr
+            /*if (!verify_mult_power(t, n, tm)) {
+                // мы домножили на слишком большое число
+                tr = tm;
+            }*/
+            if (calc_g_with_power_factor(t, n, tm) + total_g[j] >= TBS) {
+                tr = tm;
+            } else {
+                tl = tm;
+            }
+        }
+
+        double good_factor = tr;
+        ASSERT(good_factor > 1, "why not?");
+#ifdef PRINT_DEBUG_INFO
+        cout << calc_g_with_power_factor(t, n, good_factor) + total_g[j] << ", good_factor: " << good_factor
+             << ", verify: " << verify_mult_power(t, n, good_factor) << endl;
+#endif
+        if (verify_mult_power(t, n, good_factor)) {
+            return good_factor;
+        } else {
+            return 0;
         }
     }
 
@@ -665,393 +820,48 @@ struct Solution {
 
         set_power(t, build_weights_of_power(t, js));
 
-        return;
+        // было без штук ниже
+        // 13507.748 points -> 13573.871 points
 
-        // для каждого r выберем какой запрос поставим
-
-        uint64_t s = js.size() + 1;
-        uint64_t MAX = 1;
-        for (int r = 0; r < R; r++) {
-            MAX *= s;
+        for (int j: js) {
+            minimize_power(t, j);
         }
-
-        cout << t << ' ' << pow(s, R) << ' ' << MAX << ' ';
-        cout.flush();
-
-        auto set_power_for_msk = [&](uint64_t msk) { // NOLINT
-            // set zero power
-            for (int n = 0; n < N; n++) {
-                for (int k = 0; k < K; k++) {
-                    for (int r = 0; r < R; r++) {
-                        p[t][n][k][r] = 0;
-                    }
-                }
-            }
-
-            // (weight, n, k, r)
-            vector<tuple<double, int, int, int>> set_of_weights;
-
-            auto calc_sum = [&]() {
-                vector<double> sum_weight(K);
-                for (auto [weight, n, k, r]: set_of_weights) {
-                    ASSERT(weight >= 0, "invalid weight");
-                    sum_weight[k] += weight;
-                }
-                return sum_weight;
-            };
-
-            auto calc_sum2 = [&]() {
-                vector<vector<double>> sum_weight(K, vector<double>(R));
-                for (auto [weight, n, k, r]: set_of_weights) {
-                    ASSERT(weight >= 0, "invalid weight");
-                    sum_weight[k][r] += weight;
-                }
-                return sum_weight;
-            };
-
-            auto fix_sum = [&]() {
-                if (use_build_weight_version == ONCE_IN_R) {
-                    auto sum_weight = calc_sum();
-
-                    for (auto &[weight, n, k, r]: set_of_weights) {
-                        if (sum_weight[k] != 0) {
-                            weight = weight / sum_weight[k];
-                        } else {
-                            weight = 0;
-                        }
-                    }
-                } else {
-                    auto sum_weight = calc_sum2();
-
-                    for (auto &[weight, n, k, r]: set_of_weights) {
-                        if (sum_weight[k][r] != 0) {
-                            weight = weight / sum_weight[k][r];
-                        } else {
-                            weight = 0;
-                        }
-                    }
-                }
-            };
-
-            uint64_t x = msk;
-            for (int r = 0; r < R; r++, x /= s) {
-                uint64_t val = x % s;
-                if (val != 0) {
-                    val--;
-
-                    int j = js[val];
-
-                    auto [TBS, n, t0, t1, ost_len] = requests[j];
-
-                    for (int k = 0; k < K; k++) {
-                        double weight = 1;
-
-                        ASSERT(total_g[j] < TBS, "failed");
-
-                        weight *= 1.0 / log(1 + TBS);
-
-                        //weight = 30 - log(1 + TBS);//+ log(1 + total_g[j]);
-
-                        //cout << weight << endl;
-                        ASSERT(weight >= 0 && !is_spoiled(weight), "invalid weight");
-
-                        set_of_weights.emplace_back(weight, n, k, r);
-                    }
-                }
-            }
-
-            fix_sum();
-
-            set_power(t, set_of_weights);
-
-            // максимально сильно уменьшим затраченную силу
-            auto update_power_to_min = [&]() { // NOLINT
-                bool run = true;
-                while (run) {
-                    run = false;
-                    for (int j: js) {
-                        auto [TBS, n, t0, t1, ost_len] = requests[j];
-                        double add_g = get_g(t, n);
-                        if (add_g + total_g[j] >= TBS + 1e-1) {
-                            run = true;
-                            //cout << "update: " << TBS << ' ' << add_g + total_g[j] << "->";
-
-                            auto calc_add_g = [&](double power_factor) {
-                                vector<vector<double>> save_p(K, vector<double>(R));
-                                for (int k = 0; k < K; k++) {
-                                    for (int r = 0; r < R; r++) {
-                                        save_p[k][r] = p[t][n][k][r];
-                                        p[t][n][k][r] *= power_factor;
-                                    }
-                                }
-                                double add_g = get_g(t, n);
-
-                                for (int k = 0; k < K; k++) {
-                                    for (int r = 0; r < R; r++) {
-                                        p[t][n][k][r] = save_p[k][r];
-                                    }
-                                }
-
-                                return add_g;
-                            };
-
-                            double tl = 0, tr = 1;
-                            while (tl < tr - 1e-6) {
-                                double tm = (tl + tr) / 2;
-                                if (calc_add_g(tm) + total_g[j] >= TBS) {
-                                    tr = tm;
-                                } else {
-                                    tl = tm;
-                                }
-                            }
-                            double good_factor = tr;
-                            for (int k = 0; k < K; k++) {
-                                for (int r = 0; r < R; r++) {
-                                    p[t][n][k][r] *= good_factor;
-                                }
-                            }
-                            //cout << get_g(t, n) << endl;
-                        }
-                    }
-                }
-            };
-
-            update_power_to_min();
-
-            // добавить силы нуждающимся
-            set<int> used;
-            while(true){
-                int best_j = -1;
-                double best_f = -1e300;
-                for (int j: js) {
-                    auto [TBS, n, t0, t1, ost_len] = requests[j];
-                    if (!used.contains(j) && get_g(t, n) != 0 && get_g(t, n) + total_g[j] < TBS) {
-                        double cur_f = get_g(t, n);
-                        if(best_j == -1 || best_f < cur_f){
-                            best_j = j;
-                            best_f = cur_f;
-                        }
-                    }
-                }
-
-                if(best_j == -1){
-                    break;
-                }
-
-                int j = best_j;
-                used.insert(j);
-                auto [TBS, n, t0, t1, ost_len] = requests[j];
-
-                //cout << "upkek: " << TBS << ' ' << get_g(t, n) + total_g[j] << ' ';
-
-                auto calc_add_g = [&](double power_factor) {
-                    vector<vector<double>> save_p(K, vector<double>(R));
-                    for (int k = 0; k < K; k++) {
-                        for (int r = 0; r < R; r++) {
-                            save_p[k][r] = p[t][n][k][r];
-                            p[t][n][k][r] *= power_factor;
-                        }
-                    }
-                    double add_g = get_g(t, n);
-
-                    for (int k = 0; k < K; k++) {
-                        for (int r = 0; r < R; r++) {
-                            p[t][n][k][r] = save_p[k][r];
-                        }
-                    }
-
-                    return add_g;
-                };
-
-                auto verify = [&](double power_factor) { // NOLINT
-                    vector<double> sum(K);
-                    for (int m = 0; m < N; m++) {
-                        for (int k = 0; k < K; k++) {
-                            for (int r = 0; r < R; r++) {
-                                if (m != n) {
-                                    sum[k] += p[t][m][k][r];
-                                } else {
-                                    sum[k] += power_factor * p[t][m][k][r];
-                                }
-                            }
-                        }
-                    }
-                    for (int k = 0; k < K; k++) {
-                        if (sum[k] > R) {
-                            return false;
-                        }
-                    }
-                    for (int k = 0; k < K; k++) {
-                        for (int r = 0; r < R; r++) {
-                            double sum = 0;
-                            for (int m = 0; m < N; m++) {
-                                if (m != n) {
-                                    sum += p[t][m][k][r];
-                                } else {
-                                    sum += power_factor * p[t][m][k][r];
-                                }
-                            }
-                            if (sum > 4) {
-                                return false;
-                            }
-                        }
-                    }
-                    return true;
-                };
-
-                double tl = 0, tr = 1e9;
-                while (tl < tr - 1e-6) {
-                    double tm = (tl + tr) / 2;
-                    if (calc_add_g(tm) + total_g[j] >= TBS) {
-                        tr = tm;
-                    } else {
-                        tl = tm;
-                    }
-                }
-
-                double good_factor = tr;
-                //cout << good_factor << ' ' << verify(good_factor) << ' ' << calc_add_g(good_factor) + total_g[j] << endl;
-                if(verify(good_factor)) {
-                    for (int k = 0; k < K; k++) {
-                        for (int r = 0; r < R; r++) {
-                            p[t][n][k][r] *= good_factor;
-                        }
-                    }
-                }
-
-            }
-
-        };
-
-        double best_f = -1e300;
-        uint64_t best_msk = 0;
-        for (uint64_t msk = 0; msk < MAX; msk++) {
-            set_power_for_msk(msk);
-
-            double cur_f = 0;
+        // мы освободили силу без ущерба ответу
+        // стало только лучше
+        // теперь давайте эту свободную силу заиспользуем: дадим ее другим
+        set<int> tried;
+        while (true) {
+            // найдем запрос с самым минимальным добавлением силы, чтобы удовлетворить его
+            int best_j = -1;
+            double best_f = 1e300;
             for (int j: js) {
                 auto [TBS, n, t0, t1, ost_len] = requests[j];
-                double add_g = get_g(t, n);
-                //cur_f += add_g;
-                if (add_g + total_g[j] >= TBS) {
-                    cur_f += 1e5;
+                if (!tried.contains(j) && sum_power(t, n) != 0 && total_g[j] + get_g(t, n) < TBS) {
+                    // мы не пытались улучшить этот запрос и он используется, но не отправлен
+                    double cur_f = TBS - (total_g[j] + get_g(t,n));
+                    //(calc_power_factor_for_accept_request(t, j) - 1) * sum_power(t, n);
+                    if (best_j == -1 || best_f > cur_f) {
+                        best_f = cur_f;
+                        best_j = j;
+                    }
                 }
             }
 
-            if (cur_f > best_f) {
-                //cout << cur_f << "->";
-                best_f = cur_f;
-                best_msk = msk;
+            if (best_j == -1) {
+                break;
+            }
+
+            int j = best_j;
+            auto [TBS, n, t0, t1, ost_len] = requests[j];
+            tried.insert(j);
+
+            double factor = calc_power_factor_for_accept_request(t, j);
+
+            if (factor != 0) {
+                mult_power(t, n, factor);
             }
         }
-        set_power_for_msk(best_msk);
-        cout << "best_f: " << best_f << " best_msk: " << best_msk << ' ' << get_score() << endl;
     }
-
-/*
-C:\Windows\system32\wsl.exe --distribution Ubuntu --exec /bin/bash -c "cd '/root/Deterministic Scheduling for Extended Reality over 5G and Beyond/Deterministic-Scheduling-for-Extended-Reality-over-5G-and-Beyond' && '/root/Deterministic Scheduling for Extended Reality over 5G and Beyond/Deterministic-Scheduling-for-Extended-Reality-over-5G-and-Beyond/solution'"
-TEST CASE==============
-50 243 243 best_f: 200000 best_msk: 5 -2.92304e-07
-98 1024 1024 best_f: 300000 best_msk: 27 2
-72 3125 3125 best_f: 400000 best_msk: 819 5
-77 3125 3125 best_f: 400000 best_msk: 969 8.99999
-2 7776 7776 best_f: 500000 best_msk: 1865 13
-5 7776 7776 best_f: 400000 best_msk: 317 18
-9 7776 7776 best_f: 400000 best_msk: 353 22
-39 7776 7776 best_f: 500000 best_msk: 1865 26
-67 7776 7776 best_f: 500000 best_msk: 1865 31
-82 7776 7776 best_f: 500000 best_msk: 1865 36
-90 7776 7776 best_f: 400000 best_msk: 311 41
-4 16807 16807 best_f: 500000 best_msk: 3275 45
-25 16807 16807 best_f: 500000 best_msk: 6068 50
-31 16807 16807 best_f: 500000 best_msk: 3267 55
-33 16807 16807 best_f: 500000 best_msk: 6068 60
-37 16807 16807 best_f: 400000 best_msk: 475 65
-44 16807 16807 best_f: 500000 best_msk: 3267 69
-55 16807 16807 best_f: 500000 best_msk: 3267 74
-70 16807 16807 best_f: 500000 best_msk: 3275 79
-83 16807 16807 best_f: 500000 best_msk: 3267 84
-86 16807 16807 best_f: 500000 best_msk: 3267 89
-89 16807 16807 best_f: 400000 best_msk: 2867 94
-95 16807 16807 best_f: 500000 best_msk: 6068 98
-6 32768 32768 best_f: 500000 best_msk: 5349 103
-19 32768 32768 best_f: 500000 best_msk: 5349 108
-27 32768 32768 best_f: 500000 best_msk: 5350 113
-35 32768 32768 best_f: 500000 best_msk: 5367 118
-40 32768 32768 best_f: 500000 best_msk: 5349 123
-59 32768 32768 best_f: 500000 best_msk: 5422 128
-60 32768 32768 best_f: 500000 best_msk: 5349 133
-62 32768 32768 best_f: 500000 best_msk: 5349 138
-64 32768 32768 best_f: 500000 best_msk: 5934 143
-80 32768 32768 best_f: 500000 best_msk: 5358 148
-84 32768 32768 best_f: 500000 best_msk: 10030 153
-92 32768 32768 best_f: 500000 best_msk: 5350 158
-97 32768 32768 best_f: 500000 best_msk: 5350 163
-11 59049 59049 best_f: 500000 best_msk: 8304 168
-12 59049 59049 best_f: 500000 best_msk: 8303 173
-14 59049 59049 best_f: 500000 best_msk: 9124 178
-16 59049 59049 best_f: 500000 best_msk: 8304 183
-17 59049 59049 best_f: 500000 best_msk: 8303 188
-18 59049 59049 best_f: 500000 best_msk: 8305 193
-21 59049 59049 best_f: 500000 best_msk: 8303 198
-24 59049 59049 best_f: 500000 best_msk: 8311 203
-28 59049 59049 best_f: 500000 best_msk: 8303 208
-42 59049 59049 best_f: 500000 best_msk: 8313 213
-45 59049 59049 best_f: 500000 best_msk: 9123 218
-47 59049 59049 best_f: 500000 best_msk: 8303 223
-54 59049 59049 best_f: 500000 best_msk: 8303 228
-63 59049 59049 best_f: 500000 best_msk: 8304 233
-69 59049 59049 best_f: 500000 best_msk: 8303 238
-73 59049 59049 best_f: 500000 best_msk: 8303 243
-79 59049 59049 best_f: 500000 best_msk: 8303 248
-94 59049 59049 best_f: 500000 best_msk: 8303 253
-13 100000 100000 best_f: 500000 best_msk: 12345 258
-15 100000 100000 best_f: 500000 best_msk: 12345 263
-22 100000 100000 best_f: 500000 best_msk: 12345 268
-23 100000 100000 best_f: 500000 best_msk: 12345 273
-30 100000 100000 best_f: 500000 best_msk: 13467 278
-32 100000 100000 best_f: 500000 best_msk: 24569 283
-51 100000 100000 best_f: 500000 best_msk: 12345 288
-53 100000 100000 best_f: 500000 best_msk: 12345 293
-56 100000 100000 best_f: 500000 best_msk: 12345 298
-57 100000 100000 best_f: 500000 best_msk: 12345 303
-65 100000 100000 best_f: 500000 best_msk: 13456 308
-75 100000 100000 best_f: 500000 best_msk: 23169 313
-76 100000 100000 best_f: 500000 best_msk: 12345 318
-78 100000 100000 best_f: 500000 best_msk: 12346 323
-8 161051 161051 best_f: 500000 best_msk: 17715 328
-20 161051 161051 best_f: 500000 best_msk: 17715 333
-26 161051 161051 best_f: 500000 best_msk: 17715 338
-34 161051 161051 best_f: 500000 best_msk: 17715 343
-36 161051 161051 best_f: 500000 best_msk: 17715 348
-43 161051 161051 best_f: 500000 best_msk: 17715 353
-46 161051 161051 best_f: 500000 best_msk: 17715 358
-48 161051 161051 best_f: 500000 best_msk: 17715 363
-58 161051 161051 best_f: 500000 best_msk: 17715 368
-66 161051 161051 best_f: 500000 best_msk: 17715 373
-87 161051 161051 best_f: 500000 best_msk: 17715 378
-93 161051 161051 best_f: 500000 best_msk: 17848 383
-1 248832 248832 best_f: 500000 best_msk: 24677 388
-7 248832 248832 best_f: 500000 best_msk: 24678 393
-38 248832 248832 best_f: 500000 best_msk: 24677 398
-49 248832 248832 best_f: 500000 best_msk: 24704 403
-52 248832 248832 best_f: 500000 best_msk: 47298 408
-61 248832 248832 best_f: 500000 best_msk: 24677 413
-68 248832 248832 best_f: 500000 best_msk: 24690 418
-85 248832 248832 best_f: 500000 best_msk: 24729 423
-91 248832 248832 best_f: 500000 best_msk: 24677 428
-10 371293 371293 best_f: 500000 best_msk: 33519 433
-29 371293 371293 best_f: 500000 best_msk: 33702 438
-41 371293 371293 best_f: 500000 best_msk: 33519 443
-71 371293 371293 best_f: 500000 best_msk: 33519 448
-74 371293 371293 best_f: 500000 best_msk: 35900 453
-88 371293 371293 best_f: 500000 best_msk: 33519 458
-96 537824 537824 best_f: 500000 best_msk: 44553 463
-0 759375 759375 best_f: 500000 best_msk: 58115 468
-3 759375 759375 best_f: 500000 best_msk: 58115 473
-81 1.41986e+06 1419857 best_f: 500000 best_msk: 99507 478
-483/829
-*/
 
     void set_zero_power(int j, vector<vector<int>> &js) {
         auto [TBS, n, t0, t1, ost_len] = requests[j];
@@ -1262,7 +1072,7 @@ TEST CASE==============
     }
 
     double get_g(int t, int n) {
-        //return correct_get_g(t, n);
+        return correct_get_g(t, n);
 /*
 TEST CASE==============
 0.999996/2
@@ -1293,30 +1103,8 @@ TEST CASE==============
             //cout << "kek: " << accum_prod << ' ' << count << endl;
         }
         ASSERT(sum >= 0 && !is_spoiled(sum), "invalid g");
-        //ASSERT(correct_get_g(t, n) == 192 * sum, "failed calc");
+        ASSERT(correct_get_g(t, n) == 192 * sum, "failed calc");
         return 192 * sum;
-    }
-
-    bool remove_bad_request() {
-        auto f = [&](int j) {
-            return -count_of_set_r_for_request[j] * 10000 + (requests[j].TBS - total_g[j]);
-        };
-        int best_j = -1;
-
-        for (int j = 0; j < J; j++) {
-            if (used_request[j] && total_g[j] < requests[j].TBS) {
-                // bad request
-                if (best_j == -1 || f(j) < f(best_j)) {
-                    best_j = j;
-                }
-            }
-        }
-        if (best_j == -1) {
-            return false;
-        }
-        // remove this request [best_j]
-        used_request[best_j] = false;
-        return true;
     }
 };
 
@@ -1338,46 +1126,36 @@ int main() {
         }
         cout << "TEST CASE==============\n";
 #endif
-        //std::ios::sync_with_stdio(false);
-        //std::cin.tie(0);
-        //std::cout.tie(0);
+    //std::ios::sync_with_stdio(false);
+    //std::cin.tie(0);
+    //std::cout.tie(0);
 
-        Solution solution;
+    Solution solution;
 #ifdef FAST_STREAM
-        solution.read();
+    solution.read();
 #else
-        solution.read(input);
+    solution.read(input);
 #endif
-        solution.used_request.assign(solution.J, true);
+    solution.used_request.assign(solution.J, true);
 
-        //Solution solution2 = solution;
+    Solution solution2 = solution;
 
-        //solution2.use_build_weight_version = Solution::ONCE_IN_R;
-        solution.use_build_weight_version = Solution::ONCE_IN_R;
+    solution2.use_build_weight_version = Solution::ONCE_IN_R;
+    solution.use_build_weight_version = Solution::ALL;
 
-        solution.solve();
-        /*solution2.solve();
+    solution.solve();
+    solution2.solve();
 
-        if (solution.get_score() < solution2.get_score()) {
-            solution = solution2;
-        }*/
-
-        /*while (true) {
-            solution.solve();
-    #ifndef FAST_STREAM
-            cout << solution.get_score() << '/' << solution.J << '\n';
-    #endif
-            if (!solution.remove_bad_request()) {
-                break;
-            }
-        }*/
+    if (solution.get_score() < solution2.get_score()) {
+        solution = solution2;
+    }
 
 #ifndef FAST_STREAM
-        cout << solution.get_score() << '/' << solution.J << '\n';
+    cout << solution.get_score() << '/' << solution.J << '\n';
 #endif
 
 #ifdef FAST_STREAM
-        solution.print();
+    solution.print();
 #endif
 
 #ifndef FAST_STREAM
