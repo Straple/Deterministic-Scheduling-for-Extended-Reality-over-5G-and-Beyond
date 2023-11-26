@@ -295,7 +295,7 @@ bool is_spoiled(double num) {
     return std::isnan(num) || std::isinf(num);
 }
 
-#define FAST_STREAM
+//#define FAST_STREAM
 
 //#define PRINT_DEBUG_INFO
 
@@ -540,6 +540,34 @@ struct Solution {
         return true;
     }
 
+    bool verify_power(int t) {
+        vector<double> sum(K);
+        for (int n = 0; n < N; n++) {
+            for (int k = 0; k < K; k++) {
+                for (int r = 0; r < R; r++) {
+                    sum[k] += p[t][n][k][r];
+                }
+            }
+        }
+        for (int k = 0; k < K; k++) {
+            if (sum[k] > R + 1e-9) {
+                return false;
+            }
+        }
+        for (int k = 0; k < K; k++) {
+            for (int r = 0; r < R; r++) {
+                double sum = 0;
+                for (int n = 0; n < N; n++) {
+                    sum += p[t][n][k][r];
+                }
+                if (sum > 4 + 1e-9) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     // если этот запрос отправлен, то эта функция минимизирует количество затраченной силы для этого,
     // чтобы дать возможность другим запросам пользоваться большей силой
     /// !вызывать до обновления total_g[j]!
@@ -594,14 +622,19 @@ struct Solution {
         cout << "more_power(" << TBS << ") " << get_g(t, n) + total_g[j] << "->";
 #endif
 
-        double tl = 0, tr = 1e9;
+        double tl = 1, tr = 1e9;
         while (tl < tr - 1e-3) {
             double tm = (tl + tr) / 2;
-            // TODO: это сделает неточным good_factor=tr
-            /*if (!verify_mult_power(t, n, tm)) {
-                // мы домножили на слишком большое число
+            if (verify_mult_power(t, n, tm)) {
+                tl = tm;
+            } else {
                 tr = tm;
-            }*/
+            }
+        }
+        tr = tl;
+        tl = 1;
+        while (tl < tr - 1e-3) {
+            double tm = (tl + tr) / 2;
             if (calc_g_with_power_factor(t, n, tm) + total_g[j] >= TBS) {
                 tr = tm;
             } else {
@@ -610,11 +643,13 @@ struct Solution {
         }
 
         double good_factor = tr;
-        ASSERT(good_factor > 1, "why not?");
+        //cout << good_factor << endl;
 #ifdef PRINT_DEBUG_INFO
         cout << calc_g_with_power_factor(t, n, good_factor) + total_g[j] << ", good_factor: " << good_factor
              << ", verify: " << verify_mult_power(t, n, good_factor) << endl;
 #endif
+        ASSERT(verify_power(t), "??");
+        ASSERT(good_factor >= 1, "why not?");
         if (verify_mult_power(t, n, good_factor)) {
             return good_factor;
         } else {
@@ -795,10 +830,18 @@ struct Solution {
             for (auto [weight, n, k, r]: set_of_weights) {
                 ASSERT(0 <= weight && weight <= 1, "invalid weight");
             }
-            auto sum_weight = calc_sum();
-            for (int k = 0; k < K; k++) {
-                ASSERT(sum_weight[k] == 0 || abs(sum_weight[k] - 1) < 1e-9, "invalid sum_weight");
-
+            if (use_build_weight_version == ONCE_IN_R) {
+                auto sum_weight = calc_sum();
+                for (int k = 0; k < K; k++) {
+                    ASSERT(sum_weight[k] == 0 || abs(sum_weight[k] - 1) < 1e-9, "invalid sum_weight");
+                }
+            } else {
+                auto sum_weight = calc_sum2();
+                for (int k = 0; k < K; k++) {
+                    for (int r = 0; r < R; r++) {
+                        ASSERT(sum_weight[k][r] == 0 || abs(sum_weight[k][r] - 1) < 1e-9, "invalid sum_weight");
+                    }
+                }
             }
         };
 
@@ -806,11 +849,44 @@ struct Solution {
         threshold();
         fix_sum();
 
-/*#ifdef DEBUG_MODE
+#ifdef DEBUG_MODE
         verify();
-#endif*/
+#endif
 
         return set_of_weights;
+    }
+
+    void set_power_for_state(int t, const vector<int> &js, const vector<vector<int>> &state) {
+        for (int n = 0; n < N; n++) {
+            for (int k = 0; k < K; k++) {
+                for (int r = 0; r < R; r++) {
+                    p[t][n][k][r] = 0;
+                }
+            }
+        }
+
+        for (int k = 0; k < K; k++) {
+            double sump = 0;
+            for (int r = 0; r < R; r++) {
+                if (state[k][r] != -1) {
+                    int j = js[state[k][r]];
+                    int n = requests[j].n;
+
+                    p[t][n][k][r] = 4;
+                    sump += p[t][n][k][r];
+                }
+            }
+
+            for (int r = 0; r < R; r++) {
+                if (state[k][r] != -1) {
+                    int j = js[state[k][r]];
+                    int n = requests[j].n;
+
+                    p[t][n][k][r] *= min(1.0, R / sump);
+                }
+            }
+        }
+        verify_power(t);
     }
 
     void set_nice_power(int t, const vector<int> &js) {
@@ -818,11 +894,160 @@ struct Solution {
         // что это значит? наверное мы хотим как можно больший прирост g
         // а также чтобы доотправлять сообщения
 
+        // state[k][r] = какой запрос здесь сидит, либо -1, если никого нет
+        vector<vector<int>> state(K, vector<int>(R));
+
+        mt19937 rnd(42);
+        auto build_random_state = [&]() {
+            for (int k = 0; k < K; k++) {
+                for (int r = 0; r < R; r++) {
+                    state[k][r] = -1;
+                }
+            }
+            for (int r = 0; r < R; r++) {
+                int x = int(rnd() % js.size());
+                for (int k = 0; k < K; k++) {
+                    state[k][r] = x;
+                }
+            }
+        };
+
+        auto f = [&]() { // NOLINT
+            double result = 0;
+            set_power_for_state(t, js, state);
+
+            for (int j: js) {
+                auto [TBS, n, t0, t1, ost_len] = requests[j];
+                if (get_g(t, n) + total_g[j] >= TBS) {
+                    result += 1e4;
+                } else {
+                    result += get_g(t, n) - TBS;
+                }
+            }
+            return result;
+        };
+
+        auto best_state = state;
+        double best_f = f();
+        cout << best_f << "->";
+        for (int step = 0; step < 10; step++) {
+            build_random_state();
+            double cur_f = f();
+            //cout << cur_f << "->";
+            bool run = true;
+            while (run) {
+                run = false;
+                for (int k = 0; k < K; k++) {
+                    for (int r = 0; r < R; r++) {
+                        for (int x = -1; x < int(js.size()); x++) {
+                            int old_state_val = state[k][r];
+                            state[k][r] = x;
+                            double new_f = f();
+                            if (new_f > cur_f) {
+                                cur_f = new_f;
+                                run = true;
+                                //cout << cur_f << "->";
+                            } else {
+                                state[k][r] = old_state_val;
+                            }
+                        }
+                    }
+                }
+            }
+            f();
+
+            if (best_f < cur_f) {
+                best_f = cur_f;
+                cout << best_f << "->";
+                best_state = state;
+            }
+        }
+        cout << endl;
+        state = best_state;
+        f();
+        cout << "score: " << get_score() << endl;
+
+        // 21 test: 642.998/829
+        /*vector<vector<int>> state(K, vector<int>(R));
+
+        mt19937 rnd(42);
+        auto build_random_state = [&]() {
+            for (int k = 0; k < K; k++) {
+                for (int r = 0; r < R; r++) {
+                    state[k][r] = -1;
+                }
+            }
+            for(int r = 0; r < R; r++){
+                int x = int(rnd() % js.size());
+                for(int k = 0; k < K; k++) {
+                    state[k][r] = x;
+                }
+            }
+        };
+
+        auto f = [&]() {
+            double result = 0;
+            set_power_for_state(t, js, state);
+            for (int j: js) {
+                auto [TBS, n, t0, t1, ost_len] = requests[j];
+                if (get_g(t, n) + total_g[j] >= TBS) {
+                    result += 1e4;
+                }
+                else{
+                    result += get_g(t, n) - TBS;
+                }
+            }
+            return result;
+        };
+
+        auto best_state = state;
+        double best_f = f();
+        cout << best_f << "->";
+        for (int step = 0; step < 1000; step++) {
+            build_random_state();
+            double cur_f = f();
+            //cout << cur_f << "->";
+            bool run = true;
+            while (run) {
+                run = false;
+                for (int k = 0; k < K; k++) {
+                    for (int r = 0; r < R; r++) {
+                        for (int x = -1; x < int(js.size()); x++) {
+                            int old_state_val = state[k][r];
+                            state[k][r] = x;
+                            double new_f = f();
+                            if (new_f > cur_f) {
+                                cur_f = new_f;
+                                run = true;
+                                //cout << cur_f << "->";
+                            } else {
+                                state[k][r] = old_state_val;
+                            }
+                        }
+                    }
+                }
+            }
+            f();
+
+            if (best_f < cur_f) {
+                best_f = cur_f;
+                cout << best_f << "->";
+                best_state = state;
+            }
+        }
+        cout << endl;
+        state = best_state;
+        f();
+        cout << "score: " << get_score() << endl;*/
+
+        // 14080.851 points
+        /*ASSERT(verify_power(t), "WHAT?");
+
         set_power(t, build_weights_of_power(t, js));
 
-        // было без штук ниже
-        // 13507.748 points -> 13573.871 points
+        ASSERT(verify_power(t), "WHAT?");
 
+        // совсем чуть-чуть улучшает
         for (int j: js) {
             minimize_power(t, j);
         }
@@ -838,7 +1063,7 @@ struct Solution {
                 auto [TBS, n, t0, t1, ost_len] = requests[j];
                 if (!tried.contains(j) && sum_power(t, n) != 0 && total_g[j] + get_g(t, n) < TBS) {
                     // мы не пытались улучшить этот запрос и он используется, но не отправлен
-                    double cur_f = TBS - (total_g[j] + get_g(t,n));
+                    double cur_f = TBS - (total_g[j] + get_g(t, n));
                     //(calc_power_factor_for_accept_request(t, j) - 1) * sum_power(t, n);
                     if (best_j == -1 || best_f > cur_f) {
                         best_f = cur_f;
@@ -855,12 +1080,16 @@ struct Solution {
             auto [TBS, n, t0, t1, ost_len] = requests[j];
             tried.insert(j);
 
+            ASSERT(verify_power(t), "WHAT?");
             double factor = calc_power_factor_for_accept_request(t, j);
+
+            ASSERT(verify_power(t), "WHAT?");
 
             if (factor != 0) {
                 mult_power(t, n, factor);
             }
-        }
+            ASSERT(verify_power(t), "WHAT?");
+        }*/
     }
 
     void set_zero_power(int j, vector<vector<int>> &js) {
@@ -1110,7 +1339,7 @@ TEST CASE==============
 
 int main() {
 #ifndef FAST_STREAM
-    for (int test_case = 0; test_case <= 3; test_case++) {
+    for (int test_case = 2; test_case <= 2; test_case++) {
 
         std::ifstream input("input.txt");
         if (test_case == 0) {
@@ -1126,36 +1355,37 @@ int main() {
         }
         cout << "TEST CASE==============\n";
 #endif
-    //std::ios::sync_with_stdio(false);
-    //std::cin.tie(0);
-    //std::cout.tie(0);
+        //std::ios::sync_with_stdio(false);
+        //std::cin.tie(0);
+        //std::cout.tie(0);
 
-    Solution solution;
+        Solution solution;
 #ifdef FAST_STREAM
-    solution.read();
+        solution.read();
 #else
-    solution.read(input);
+        solution.read(input);
 #endif
-    solution.used_request.assign(solution.J, true);
+        solution.used_request.assign(solution.J, true);
 
-    Solution solution2 = solution;
+        solution.solve();
+        /*Solution solution2 = solution;
 
-    solution2.use_build_weight_version = Solution::ONCE_IN_R;
-    solution.use_build_weight_version = Solution::ALL;
+        solution2.use_build_weight_version = Solution::ONCE_IN_R;
+        solution.use_build_weight_version = Solution::ALL;
 
-    solution.solve();
-    solution2.solve();
+        solution.solve();
+        solution2.solve();
 
-    if (solution.get_score() < solution2.get_score()) {
-        solution = solution2;
-    }
+        if (solution.get_score() < solution2.get_score()) {
+            solution = solution2;
+        }*/
 
 #ifndef FAST_STREAM
-    cout << solution.get_score() << '/' << solution.J << '\n';
+        cout << solution.get_score() << '/' << solution.J << '\n';
 #endif
 
 #ifdef FAST_STREAM
-    solution.print();
+        solution.print();
 #endif
 
 #ifndef FAST_STREAM
