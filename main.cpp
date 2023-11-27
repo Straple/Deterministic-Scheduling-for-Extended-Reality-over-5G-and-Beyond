@@ -946,9 +946,10 @@ struct Solution {
                 auto [TBS, n, t0, t1, ost_len] = requests[j];
                 add_g[t][n] = get_g(t, n);
                 if (add_g[t][n] + total_g[j] >= TBS) {
-                    result += 1e5;
+                    result += 1e6;
+                    result -= log((total_g[j] + add_g[t][n]) - TBS + 1);
                 } else {
-                    result += add_g[t][n] - TBS;
+                    result += -TBS + add_g[t][n];
                 }
             }
             return result;
@@ -1041,11 +1042,94 @@ TEST CASE==============
 183.995/184 1.21331s
 */
 
-        for (int step = 0; step < 10; step++) {
+/*
+ * C:\Windows\system32\wsl.exe --distribution Ubuntu --exec /bin/bash -c "cd '/root/Deterministic Scheduling for Extended Reality over 5G and Beyond/Deterministic-Scheduling-for-Extended-Reality-over-5G-and-Beyond' && '/root/Deterministic Scheduling for Extended Reality over 5G and Beyond/Deterministic-Scheduling-for-Extended-Reality-over-5G-and-Beyond/solution'"
+TEST CASE==============
+TIME: 50
+score: 2/2
+1 1 1 1 1
+1 1 1 1 1
+1 1 1 1 1
+1 1 1 1 1
+TIME: 98
+score: 3/3
+2 1 1 1 1
+1 1 1 1 1
+1 1 1 1 1
+1 1 1 1 1
+TIME: 72
+score: 4/4
+1 0 0 0 0
+1 0 0 0 1
+1 1 1 1 1
+1 1 1 1 1
+TIME: 77
+score: 4/4
+0 1 1 1 1
+1 1 1 1 1
+1 1 1 1 1
+1 1 1 1 1
+TIME: 2
+score: 3/5
+2 1 0 0 0
+0 1 1 0 0
+0 1 1 1 2
+0 1 1 1 1
+TIME: 5
+score: 5/5
+1 1 1 1 0
+0 0 1 0 0
+1 1 1 1 0
+1 1 1 1 1
+TIME: 9
+score: 3/5
+2 1 1 0 0
+0 1 0 2 0
+0 1 1 0 0
+0 0 0 0 2
+TIME: 39
+score: 4/5
+2 1 1 0 0
+0 0 1 2 0
+1 0 1 0 2
+0 1 1 1 1
+TIME: 67
+score: 2/5
+1 1 1 1 1
+1 1 0 2 0
+1 1 1 1 1
+1 1 1 1 1
+TIME: 82
+score: 5/5
+1 2 2 0 2
+1 3 2 2 1
+1 2 2 2 1
+1 1 1 1 1
+TIME: 90
+score: 4/5
+1 1 1 2 1
+1 1 1 0 1
+2 1 1 0 1
+3 1 2 0 0
+TIME: 4
+score: 3/6
+0 1 1 1 1
+2 1 1 0 1
+0 1 1 1 1
+1 1 1 1 1
+TIME: 25
+score: 2/6
+1 2 0 1 0
+1 0 1 0 1
+1 1 1 1 1
+1 1 0 1 1
+*/
+
+        for(int step = 0; step < 10; step++){
             build_random_state();
             double cur_f = f();
             bool run = true;
-            for (int kek = 0; kek < 1000 && run; kek++) {
+            for (int kek = 0; kek < 1e9 && run; kek++) {
                 run = false;
 
                 for (int k = 0; k < K; k++) {
@@ -1063,6 +1147,32 @@ TEST CASE==============
                         }
                     }
                 }
+                for (int k = 0; k < K; k++) {
+                    for (int r = 0; r < R; r++) {
+                        for (int k2 = 0; k2 < K; k2++) {
+                            for (int r2 = 0; r2 < R; r2++) {
+                                for (int bit = 0; bit < js.size(); bit++) {
+                                    for (int bit2 = 0; bit2 < js.size(); bit2++) {
+                                        int j = js[bit];
+                                        int j2 = js[bit2];
+
+                                        state[k][r] ^= (1ULL << bit);
+                                        state[k2][r2] ^= (1ULL << bit2);
+
+                                        double new_f = f();
+                                        if (new_f > cur_f) {
+                                            cur_f = new_f;
+                                            run = true;
+                                        } else {
+                                            state[k][r] ^= (1ULL << bit);
+                                            state[k2][r2] ^= (1ULL << bit2);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             if (best_f < cur_f) {
@@ -1075,27 +1185,43 @@ TEST CASE==============
         }
         set_power_for_state(t, js, best_state);
 
+        static ofstream output("log.txt");
+
+        output << "==========\n";
+        output << "==========\n";
+        output << "TIME: " << t << '\n';
+        int count_accepted = 0;
+        for (int j: js) {
+            auto [TBS, n, t0, t1, ost_len] = requests[j];
+            if (add_g[t][n] + total_g[j] >= TBS) {
+                count_accepted++;
+            }
+        }
+        output << "score: " << count_accepted << "/" << js.size() << endl;
+        output << "==========\n";
+        output << "counts:\n";
+        for (int k = 0; k < K; k++) {
+            for (int r = 0; r < R; r++) {
+                output << __builtin_popcountll(state[k][r]) << ' ';
+            }
+            output << '\n';
+        }
+        output << "==========\n";
+        for(int bit = 0; bit < js.size(); bit++) {
+            for (int k = 0; k < K; k++) {
+                for (int r = 0; r < R; r++) {
+                    output << ((state[k][r] >> bit) & 1) << ' ';
+                }
+                output << '\n';
+            }
+            output << "==========\n";
+        }
+        output.flush();
+
 #ifdef PRINT_SEARCH_INFO
         cout << endl;
         cout << "score: " << get_score() << endl;
 #endif
-    }
-
-    void set_zero_power(int j, vector<vector<int>> &js) {
-        auto [TBS, n, t0, t1, ost_len] = requests[j];
-        for (int t = t0; t <= t1; t++) {
-            for (int k = 0; k < K; k++) {
-                for (int r = 0; r < R; r++) {
-                    p[t][n][k][r] = 0;
-                }
-            }
-            for (int j2: js[t]) {
-                int m = requests[j2].n;
-                total_g[j2] -= add_g[t][m];
-                add_g[t][m] = get_g(t, m);
-                total_g[j2] += add_g[t][m];
-            }
-        }
     }
 
     void solve() {
@@ -1323,7 +1449,7 @@ TEST CASE==============
 
 int main() {
 #ifndef FAST_STREAM
-    for (int test_case = 0; test_case <= 3; test_case++) {
+    for (int test_case = 2; test_case <= 2; test_case++) {
 
         std::ifstream input("input.txt");
         if (test_case == 0) {
