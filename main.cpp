@@ -80,7 +80,7 @@ namespace KopeliovichStream {
 
 /** Read */
 
-    static const int buf_size = 4096;
+    static const int buf_size = 4096 * 4;
 
     static unsigned char buf[buf_size];
     static int buf_len = 0, buf_pos = 0;
@@ -302,7 +302,7 @@ bool high_equal(double x, double y) {
     return abs(x - y) <= 1e-9 * max(abs(x), abs(y));
 }
 
-//#define FAST_STREAM
+#define FAST_STREAM
 
 //#define PRINT_DEBUG_INFO
 
@@ -628,12 +628,6 @@ struct Solution {
         };
 #endif
 
-        // dp_sum[n][k][r]
-        vector<vector<vector<double>>> dp_sum(N, vector(K, vector<double>(R)));
-
-        // dp_sum_2[n][r]
-        vector<vector<double>> dp_sum_2(N, vector<double>(R));
-
         // dp_exp_d_prod[n][k][r]
         vector<vector<vector<double>>> dp_exp_d_prod(N, vector(K, vector<double>(R, 1)));
 
@@ -645,6 +639,13 @@ struct Solution {
 
         // dp_count[n][k]
         vector<vector<int>> dp_count(N, vector<int>(K));
+
+        // dp_denom_sum[n][k]
+        // 1.0 / (1 + dp_sum_2[m][r] - dp_sum[m][k][r])
+        vector<vector<vector<double>>> dp_denom_sum(N, vector(K, vector<double>(R, 1)));
+
+        // dp_denom_sum_global_add[n][r]
+        vector<vector<double>> dp_denom_sum_global_add(N, vector<double>(R));
 
         vector<int> nms;
         for (int j: js) {
@@ -664,16 +665,28 @@ struct Solution {
                 }
             }
 
-            for (int m: nms) {
-                dp_sum_2[m][r] -= dp_sum[m][k][r];
-            }
+            // ====================
+            p[t][n][k][r] += change;
+            // ====================
+
             for (int m: nms) {
                 if (m != n) {
-                    dp_sum[m][k][r] -= s0_tkrn[t][k][r][m] * p[t][n][k][r] / exp_d_2[n][k][r][m];
+                    double x = change * s0_tkrn[t][k][r][m] / exp_d_2[n][k][r][m];
+                    dp_denom_sum_global_add[m][r] += x;
+                    dp_denom_sum[m][k][r] -= x;
                 }
             }
 
-            if (p[t][n][k][r] > 0) {
+            if (p[t][n][k][r] > 1e-9 && (p[t][n][k][r] - change) < 1e-9) {
+                // было ноль, стало не ноль
+                dp_count[n][k]++;
+                for (int m: nms) {
+                    if (n != m) {
+                        dp_exp_d_prod[m][k][r] *= exp_d_2[n][k][r][m];
+                    }
+                }
+            } else if (p[t][n][k][r] < 1e-9) {
+                // было не ноль, стало 0
                 dp_count[n][k]--;
                 for (int m: nms) {
                     if (n != m) {
@@ -682,33 +695,10 @@ struct Solution {
                 }
             }
 
-            // ====================
-            p[t][n][k][r] += change;
-            // ====================
-
-            if (p[t][n][k][r] > 0) {
-                dp_count[n][k]++;
-                for (int m: nms) {
-                    if (n != m) {
-                        dp_exp_d_prod[m][k][r] *= exp_d_2[n][k][r][m];
-                    }
-                }
-            }
-
-            for (int m: nms) {
-                if (m != n) {
-                    dp_sum[m][k][r] += s0_tkrn[t][k][r][m] * p[t][n][k][r] / exp_d_2[n][k][r][m];
-                }
-            }
-
-            for (int m: nms) {
-                dp_sum_2[m][r] += dp_sum[m][k][r];
-            }
-
             for (int m: nms) {
                 for (int k = 0; k < K; k++) {
                     dp_prod[m][k][r] = p[t][m][k][r] * s0[t][m][k][r]
-                                       / (1 + dp_sum_2[m][r] - dp_sum[m][k][r])
+                                       / (dp_denom_sum[m][k][r] + dp_denom_sum_global_add[m][r])
                                        * dp_exp_d_prod[m][k][r];
                 }
             }
@@ -725,7 +715,7 @@ struct Solution {
             // VERIFY
 #ifdef VERIFY_DP
             auto correct_dp_sum = correct_build_dp_sum();
-            for(int n : nms){
+            for (int n: nms) {
                 for (int k = 0; k < K; k++) {
                     for (int r = 0; r < R; r++) {
                         ASSERT(!is_spoiled(dp_sum[n][k][r]), "fatal");
@@ -741,7 +731,7 @@ struct Solution {
             }
 
             auto correct_dp_sum_2 = correct_build_dp_sum_2();
-            for(int n : nms){
+            for (int n: nms) {
                 for (int r = 0; r < R; r++) {
                     ASSERT(!is_spoiled(dp_sum_2[n][r]), "fatal");
                     if (!high_equal(dp_sum_2[n][r], correct_dp_sum_2[n][r])) {
@@ -755,7 +745,7 @@ struct Solution {
             }
 
             auto correct_dp_exp_d_prod = correct_build_dp_exp_d_prod();
-            for(int n : nms){
+            for (int n: nms) {
                 for (int k = 0; k < K; k++) {
                     for (int r = 0; r < R; r++) {
                         ASSERT(!is_spoiled(dp_exp_d_prod[n][k][r]), "fatal");
@@ -772,7 +762,7 @@ struct Solution {
             }
 
             auto correct_dp_prod = correct_build_dp_prod();
-            for(int n : nms){
+            for (int n: nms) {
                 for (int k = 0; k < K; k++) {
                     for (int r = 0; r < R; r++) {
                         ASSERT(!is_spoiled(dp_prod[n][k][r]), "fatal");
@@ -789,7 +779,7 @@ struct Solution {
             }
 
             auto correct_dp_accum_prod = correct_build_dp_accum_prod();
-            for(int n : nms){
+            for (int n: nms) {
                 for (int k = 0; k < K; k++) {
                     ASSERT(!is_spoiled(dp_accum_prod[n][k]), "fatal");
                     //cout << dp_accum_prod[n][k] << '\n' << correct_dp_accum_prod[n][k] << "\n\n";
@@ -806,7 +796,7 @@ struct Solution {
             }
 
             auto correct_dp_count = correct_build_dp_count();
-            for(int n : nms){
+            for (int n: nms) {
                 for (int k = 0; k < K; k++) {
                     if (dp_count[n][k] != correct_dp_count[n][k]) {
                         ASSERT(false, "failed");
@@ -814,6 +804,20 @@ struct Solution {
                 }
             }
 #endif
+        };
+
+        auto correct_f = [&]() { // NOLINT
+            double result = 0;
+            for (int j: js) {
+                auto [TBS, n, t0, t1, ost_len] = requests[j];
+                add_g[t][n] = get_g(t, n);
+                if (add_g[t][n] + total_g[j] >= TBS) {
+                    result += 1e6;
+                } else {
+                    result += add_g[t][n] - TBS;
+                }
+            }
+            return result;
         };
 
         auto fast_f = [&]() { // NOLINT
@@ -839,20 +843,14 @@ struct Solution {
                     result += add_g[t][n] - TBS;
                 }
             }
-            return result;
-        };
 
-        auto correct_f = [&]() { // NOLINT
-            double result = 0;
-            for (int j: js) {
-                auto [TBS, n, t0, t1, ost_len] = requests[j];
-                add_g[t][n] = get_g(t, n);
-                if (add_g[t][n] + total_g[j] >= TBS) {
-                    result += 1e6;
-                } else {
-                    result += add_g[t][n] - TBS;
-                }
-            }
+            /*if (!high_equal(result, correct_f())) {
+                cout << "\n\nerror\n";
+                cout << result << endl;
+                cout << correct_f() << endl;
+                cout << abs(result - correct_f()) << endl;
+            }*/
+            //ASSERT(high_equal(result, correct_f()), "fatal");
             return result;
         };
 
@@ -880,18 +878,6 @@ struct Solution {
             }
             return add;
         };
-
-        // 653.999/829
-        // 3.48707s -> 1.56603s -> 1.47859s -> 0.48544s -> 0.157796s -> 0.0803613s
-
-        //TEST CASE==============
-        //0.999997/2 0.000384491s
-        //TEST CASE==============
-        //140.994/150 0.488945s
-        //TEST CASE==============
-        //641.999/829 1.36655s
-        //TEST CASE==============
-        //184/184 0.0152026s
 
         double best_f = fast_f();
 #ifdef VERIFY_DP
@@ -955,8 +941,8 @@ struct Solution {
                 return true;
             };
 
-            if(!do_step(j)){
-                //break;
+            if (!do_step(j)) {
+                break;
             }
         }
 
@@ -1175,40 +1161,40 @@ int main() {
         }
         cout << "TEST CASE==============\n";
 #endif
-    //std::ios::sync_with_stdio(false);
-    //std::cin.tie(0);
-    //std::cout.tie(0);
+        //std::ios::sync_with_stdio(false);
+        //std::cin.tie(0);
+        //std::cout.tie(0);
 
-    Solution solution;
+        Solution solution;
 #ifdef FAST_STREAM
-    solution.read();
+        solution.read();
 #else
-    solution.read(input);
+        solution.read(input);
         auto time_start = steady_clock::now();
 #endif
 
-    solution.solve();
-    /*Solution solution2 = solution;
+        solution.solve();
+        /*Solution solution2 = solution;
 
-    solution2.use_build_weight_version = Solution::ONCE_IN_R;
-    solution.use_build_weight_version = Solution::ALL;
+        solution2.use_build_weight_version = Solution::ONCE_IN_R;
+        solution.use_build_weight_version = Solution::ALL;
 
-    solution.solve();
-    solution2.solve();
+        solution.solve();
+        solution2.solve();
 
-    if (solution.get_score() < solution2.get_score()) {
-        solution = solution2;
-    }*/
+        if (solution.get_score() < solution2.get_score()) {
+            solution = solution2;
+        }*/
 
 #ifndef FAST_STREAM
-    auto time_stop = steady_clock::now();
+        auto time_stop = steady_clock::now();
         auto duration = time_stop - time_start;
         double time = duration_cast<nanoseconds>(duration).count() / 1e9;
         cout << solution.get_score() << '/' << solution.J << ' ' << time << "s" << endl;
 #endif
 
 #ifdef FAST_STREAM
-    solution.print();
+        solution.print();
 #endif
 
 #ifndef FAST_STREAM
