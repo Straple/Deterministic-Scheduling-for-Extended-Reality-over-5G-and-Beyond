@@ -303,7 +303,7 @@ bool high_equal(double x, double y) {
     return abs(x - y) <= 1e-9 * max(abs(x), abs(y));
 }
 
-//#define FAST_STREAM
+#define FAST_STREAM
 
 //#define PRINT_DEBUG_INFO
 
@@ -879,7 +879,7 @@ struct Solution {
         return set_of_weights;
     }*/
 
-    void set_nice_power(int t, const vector<int> &js) {
+    void set_nice_power(int t, vector<int> js) {
         // наиболее оптимально расставить силу так
         // что это значит? наверное мы хотим как можно больший прирост g
         // а также чтобы доотправлять сообщения
@@ -1009,10 +1009,16 @@ struct Solution {
         // dp_count[n][k]
         vector<vector<int>> dp_count(N, vector<int>(K));
 
+        vector<int> nms;
+        for (int j: js) {
+            nms.push_back(requests[j].n);
+        }
+        sort(nms.begin(), nms.end());
+
         auto update_dynamics = [&](int n, int k, int r, double change) { // NOLINT
             // TODO: порядок очень важен
 
-            for (int m = 0; m < N; m++) {
+            for (int m: nms) {
                 for (int k = 0; k < K; k++) {
                     if (p[t][m][k][r] > 0) {
                         ASSERT(!high_equal(0, dp_prod[m][k][r]), "dividing by zero");
@@ -1021,10 +1027,10 @@ struct Solution {
                 }
             }
 
-            for (int m = 0; m < N; m++) {
+            for (int m: nms) {
                 dp_sum_2[m][r] -= dp_sum[m][k][r];
             }
-            for (int m = 0; m < N; m++) {
+            for (int m: nms) {
                 if (m != n) {
                     dp_sum[m][k][r] -= s0_tkrn[t][k][r][m] * p[t][n][k][r] / exp_d_2[n][k][r][m];
                 }
@@ -1032,7 +1038,7 @@ struct Solution {
 
             if (p[t][n][k][r] > 0) {
                 dp_count[n][k]--;
-                for (int m = 0; m < N; m++) {
+                for (int m: nms) {
                     if (n != m) {
                         dp_exp_d_prod[m][k][r] /= exp_d_2[n][k][r][m];
                     }
@@ -1045,24 +1051,24 @@ struct Solution {
 
             if (p[t][n][k][r] > 0) {
                 dp_count[n][k]++;
-                for (int m = 0; m < N; m++) {
+                for (int m: nms) {
                     if (n != m) {
                         dp_exp_d_prod[m][k][r] *= exp_d_2[n][k][r][m];
                     }
                 }
             }
 
-            for (int m = 0; m < N; m++) {
+            for (int m: nms) {
                 if (m != n) {
                     dp_sum[m][k][r] += s0_tkrn[t][k][r][m] * p[t][n][k][r] / exp_d_2[n][k][r][m];
                 }
             }
 
-            for (int m = 0; m < N; m++) {
+            for (int m: nms) {
                 dp_sum_2[m][r] += dp_sum[m][k][r];
             }
 
-            for (int m = 0; m < N; m++) {
+            for (int m: nms) {
                 for (int k = 0; k < K; k++) {
                     dp_prod[m][k][r] = p[t][m][k][r] * s0[t][m][k][r]
                                        / (1 + dp_sum_2[m][r] - dp_sum[m][k][r])
@@ -1070,7 +1076,7 @@ struct Solution {
                 }
             }
 
-            for (int m = 0; m < N; m++) {
+            for (int m: nms) {
                 for (int k = 0; k < K; k++) {
                     if (p[t][m][k][r] > 0) {
                         dp_accum_prod[m][k] *= dp_prod[m][k][r];
@@ -1082,7 +1088,7 @@ struct Solution {
             // VERIFY
 #ifdef VERIFY_DP
             auto correct_dp_sum = correct_build_dp_sum();
-            for (int n = 0; n < N; n++) {
+            for(int n : nms){
                 for (int k = 0; k < K; k++) {
                     for (int r = 0; r < R; r++) {
                         ASSERT(!is_spoiled(dp_sum[n][k][r]), "fatal");
@@ -1098,7 +1104,7 @@ struct Solution {
             }
 
             auto correct_dp_sum_2 = correct_build_dp_sum_2();
-            for (int n = 0; n < N; n++) {
+            for(int n : nms){
                 for (int r = 0; r < R; r++) {
                     ASSERT(!is_spoiled(dp_sum_2[n][r]), "fatal");
                     if (!high_equal(dp_sum_2[n][r], correct_dp_sum_2[n][r])) {
@@ -1112,7 +1118,7 @@ struct Solution {
             }
 
             auto correct_dp_exp_d_prod = correct_build_dp_exp_d_prod();
-            for (int n = 0; n < N; n++) {
+            for(int n : nms){
                 for (int k = 0; k < K; k++) {
                     for (int r = 0; r < R; r++) {
                         ASSERT(!is_spoiled(dp_exp_d_prod[n][k][r]), "fatal");
@@ -1129,7 +1135,7 @@ struct Solution {
             }
 
             auto correct_dp_prod = correct_build_dp_prod();
-            for (int n = 0; n < N; n++) {
+            for(int n : nms){
                 for (int k = 0; k < K; k++) {
                     for (int r = 0; r < R; r++) {
                         ASSERT(!is_spoiled(dp_prod[n][k][r]), "fatal");
@@ -1146,7 +1152,7 @@ struct Solution {
             }
 
             auto correct_dp_accum_prod = correct_build_dp_accum_prod();
-            for (int n = 0; n < N; n++) {
+            for(int n : nms){
                 for (int k = 0; k < K; k++) {
                     ASSERT(!is_spoiled(dp_accum_prod[n][k]), "fatal");
                     //cout << dp_accum_prod[n][k] << '\n' << correct_dp_accum_prod[n][k] << "\n\n";
@@ -1163,7 +1169,7 @@ struct Solution {
             }
 
             auto correct_dp_count = correct_build_dp_count();
-            for (int n = 0; n < N; n++) {
+            for(int n : nms){
                 for (int k = 0; k < K; k++) {
                     if (dp_count[n][k] != correct_dp_count[n][k]) {
                         ASSERT(false, "failed");
@@ -1214,11 +1220,11 @@ struct Solution {
         };
 
         auto calc_add_power = [&](int n, int k, int r) {
-            double add = 0.5;
+            double add = 1;
 
             {
                 double sum = 0;
-                for (int n = 0; n < N; n++) {
+                for (int n: nms) {
                     sum += p[t][n][k][r];
                 }
                 add = min(add, 4 - sum);
@@ -1227,62 +1233,106 @@ struct Solution {
 
             {
                 double sum = 0;
-                for (int r = 0; r < R; r++) {
-                    for (int n = 0; n < N; n++) {
+                for (int n: nms) {
+                    for (int r = 0; r < R; r++) {
                         sum += p[t][n][k][r];
                     }
                 }
                 add = min(add, R - sum);
-                ASSERT(sum <= R, "fatal");
+                ASSERT(sum <= R + 1e-9, "fatal");
             }
             return add;
         };
 
         // 653.999/829
-        // 3.48707s -> 1.56603s -> 1.47859s
+        // 3.48707s -> 1.56603s -> 1.47859s -> 0.48544s -> 0.157796s
 
         double best_f = fast_f();
 #ifdef VERIFY_DP
         ASSERT(fast_f() == correct_f(), "fatal");
 #endif
-        while (true) {
-            //cout << best_f << "->";
-            double cur_f = best_f;
-            int best_k = -1, best_r = -1, best_j = -1;
+        const int STEPS = 1e9;
+
+        vector<double> weight(J);
+        for (int j: js) {
+            auto [TBS, n, t0, t1, ost_len] = requests[j];
             for (int k = 0; k < K; k++) {
                 for (int r = 0; r < R; r++) {
-                    for (int j: js) {
-                        auto [TBS, n, t0, t1, ost_len] = requests[j];
+                    double add = calc_add_power(n, k, r);
 
-                        // add power for p[t][n][k][r]
-                        double add = calc_add_power(n, k, r);
+                    if (add > 1e-9) {
+                        update_dynamics(n, k, r, add);
+                        weight[j] += fast_f();
+                        update_dynamics(n, k, r, -add);
+                    }
+                }
+            }
+        }
 
-                        if (add != 0) {
-                            double old_p = p[t][n][k][r];
+        for (int step = 0; step < STEPS && !js.empty(); step++) {
+            auto foo = [&](int j) {
+                auto [TBS, n, t0, t1, ost_len] = requests[j];
+                return TBS - (total_g[j] + add_g[t][n]) - weight[j] / 10;
+            };
 
-                            double new_f;
-                            {
-#ifdef VERIFY_DP
-                                ASSERT(high_equal(fast_f(), correct_f()), "fatal");
-#endif
-                                update_dynamics(n, k, r, add);
-                                new_f = fast_f();
-#ifdef VERIFY_DP
-                                ASSERT(high_equal(fast_f(), correct_f()), "fatal");
-#endif
-                                update_dynamics(n, k, r, -add);
-#ifdef VERIFY_DP
-                                ASSERT(high_equal(fast_f(), correct_f()), "fatal");
-#endif
-                            }
+            sort(js.begin(), js.end(), [&](int lhs, int rhs) {
+                return foo(lhs) < foo(rhs);
+            });
 
-                            if (best_f < new_f) {
-                                //cout << f() << "->";
-                                best_f = new_f;
-                                best_k = k;
-                                best_r = r;
-                                best_j = j;
-                            }
+            int j = -1;
+            int j1 = -1;
+            for (int j2: js) {
+                if (total_g[j2] + add_g[t][requests[j2].n] < requests[j2].TBS) {
+                    /*if(j == -1){
+                        j = j2;
+                    }
+                    else if(j1 == -1){
+                        j1 = j2;
+                    }*/
+                    j = j2;
+                    break;
+                }
+            }
+            if (j == -1) {
+                break;
+            }
+            auto [TBS, n, t0, t1, ost_len] = requests[j];
+            if (total_g[j] + add_g[t][n] >= TBS) {
+                ASSERT(false, "kek");
+            }
+
+            int best_k = -1;
+            int best_r = -1;
+            bool is_add = true;
+            for (int k = 0; k < K; k++) {
+                for (int r = 0; r < R; r++) {
+                    // add power for p[t][n][k][r]
+                    double add = calc_add_power(n, k, r);
+
+                    if (add > 1e-9) {
+                        update_dynamics(n, k, r, add);
+                        double new_f = fast_f();
+                        update_dynamics(n, k, r, -add);
+
+                        if (best_f < new_f) {
+                            best_f = new_f;
+                            best_k = k;
+                            best_r = r;
+                            is_add = true;
+                        }
+                    }
+
+                    {
+                        double sub = -p[t][n][k][r] / 2;
+                        update_dynamics(n, k, r, sub);
+                        double new_f = fast_f();
+                        update_dynamics(n, k, r, -sub);
+
+                        if (best_f < new_f) {
+                            best_f = new_f;
+                            best_k = k;
+                            best_r = r;
+                            is_add = false;
                         }
                     }
                 }
@@ -1292,118 +1342,14 @@ struct Solution {
                 break;
             }
 
-            int n = requests[best_j].n;
-            update_dynamics(n, best_k, best_r, calc_add_power(n, best_k, best_r));
-            //ASSERT(verify_power(t), "fatal");
+            if (is_add) {
+                update_dynamics(n, best_k, best_r, calc_add_power(n, best_k, best_r));
+            } else {
+                double sub = -p[t][n][best_k][best_r] / 2;
+                update_dynamics(n, best_k, best_r, sub);
+            }
+            fast_f();
         }
-        //cout << endl << endl;
-
-        //ASSERT(verify_power(t), "fatal");
-
-        // без модернизаций и смотрим чисто на f 686.998/829 8.73603s
-        /*double best_f = f();
-        vector<vector<uint64_t>> best_state = state;
-
-        cout << f() << "->";
-        for(int step = 0; step < 100; step++){
-            // (weight, k, r, bit)
-            vector<tuple<double, int, int, int>> steps;
-            for (int bit = 0; bit < js.size(); bit++) {
-                int j = js[bit];
-                auto [TBS, n, t0, t1, ost_len] = requests[j];
-
-                // 669.998/829 6.1997s
-                if(get_g(t, n) + total_g[j] < TBS) {
-
-                    for (int k = 0; k < K; k++) {
-                        for (int r = 0; r < R; r++) {
-                            double weight = 0;
-                            double old_f = f();
-                            state[k][r] ^= (1ULL << bit);
-                            set_power_for_state(t, js, state);
-                            weight = get_g(t, n) - add_g[t][n];
-                            //weight = f() - old_f;
-                            state[k][r] ^= (1ULL << bit);
-                            steps.emplace_back(weight, k, r, bit);
-                            //cout << weight << ' ';
-                        }
-                        //cout << '\n';
-                    }
-                }
-                //cout << "=============\n";
-            }
-            sort(steps.begin(), steps.end(), greater<>());
-
-            bool ok = true;
-            for (auto [weight, k, r, bit]: steps) {
-                if(weight <= 0){
-                    ok = false;
-                    break;
-                }
-                state[k][r] ^= (1ULL << bit);
-                f();
-                break;
-            }
-            cout << f() << "->";
-            cout.flush();
-            if(!ok || steps.empty()){
-                break;
-            }
-
-            if(f() > best_f){
-                best_f = f();
-                best_state = state;
-            }
-        }
-        cout << endl << endl;
-
-        state = best_state;
-        set_power_for_state(t, js, state);*/
-
-        /*{
-            static ofstream output("log.txt");
-
-            output << "==========\n";
-            output << "==========\n";
-            output << "TIME: " << t << '\n';
-            int count_accepted = 0;
-            for (int j: js) {
-                auto [TBS, n, t0, t1, ost_len] = requests[j];
-                if (get_g(t, n) + total_g[j] >= TBS) {
-                    count_accepted++;
-                }
-            }
-            output << "score: " << count_accepted << "/" << js.size() << endl;
-            output << "==========\n";
-            output << "counts:\n";
-            for (int k = 0; k < K; k++) {
-                for (int r = 0; r < R; r++) {
-                    int count = 0;
-                    for(int n = 0; n < N; n++){
-                        count += p[t][n][k][r] > 0;
-                    }
-                    output << count << ' ';
-                }
-                output << '\n';
-            }
-            output << "==========\n";
-            for (int bit = 0; bit < js.size(); bit++) {
-                int n = requests[js[bit]].n;
-                for (int k = 0; k < K; k++) {
-                    for (int r = 0; r < R; r++) {
-                        output << (p[t][n][k][r] > 0) << ' ';
-                    }
-                    output << '\n';
-                }
-                output << "==========\n";
-            }
-            output.flush();
-
-#ifdef PRINT_SEARCH_INFO
-            cout << endl;
-        cout << "score: " << get_score() << endl;
-#endif
-        }*/
     }
 
     void solve() {
