@@ -2,7 +2,6 @@
 
 using namespace std;
 
-
 namespace KopeliovichStream {
 
 /**
@@ -303,7 +302,7 @@ bool high_equal(double x, double y) {
     return abs(x - y) <= 1e-9 * max(abs(x), abs(y));
 }
 
-#define FAST_STREAM
+//#define FAST_STREAM
 
 //#define PRINT_DEBUG_INFO
 
@@ -837,7 +836,7 @@ struct Solution {
                 if (add_g[t][n] + total_g[j] >= TBS) {
                     result += 1e6;
                 } else {
-                    result += add_g[t][n];
+                    result += add_g[t][n] - TBS;
                 }
             }
             return result;
@@ -851,7 +850,7 @@ struct Solution {
                 if (add_g[t][n] + total_g[j] >= TBS) {
                     result += 1e6;
                 } else {
-                    result += add_g[t][n];
+                    result += add_g[t][n] - TBS;
                 }
             }
             return result;
@@ -885,32 +884,25 @@ struct Solution {
         // 653.999/829
         // 3.48707s -> 1.56603s -> 1.47859s -> 0.48544s -> 0.157796s -> 0.0803613s
 
+        //TEST CASE==============
+        //0.999997/2 0.000384491s
+        //TEST CASE==============
+        //140.994/150 0.488945s
+        //TEST CASE==============
+        //641.999/829 1.36655s
+        //TEST CASE==============
+        //184/184 0.0152026s
+
         double best_f = fast_f();
 #ifdef VERIFY_DP
         ASSERT(fast_f() == correct_f(), "fatal");
 #endif
-        const int STEPS = 1e9;
-
-        /*vector<double> weight(J);
-        for (int j: js) {
-            auto [TBS, n, t0, t1, ost_len] = requests[j];
-            for (int k = 0; k < K; k++) {
-                for (int r = 0; r < R; r++) {
-                    double add = calc_add_power(n, k, r);
-
-                    if (add > 1e-9) {
-                        update_dynamics(n, k, r, add);
-                        weight[j] += fast_f();
-                        update_dynamics(n, k, r, -add);
-                    }
-                }
-            }
-        }*/
+        const int STEPS = 1000;
 
         for (int step = 0; step < STEPS; step++) {
             auto foo = [&](int j) {
                 auto [TBS, n, t0, t1, ost_len] = requests[j];
-                return TBS - (total_g[j] + add_g[t][n]);// - weight[j] / 10;
+                return TBS - (total_g[j] + add_g[t][n]);
             };
 
             sort(js.begin(), js.end(), [&](int lhs, int rhs) {
@@ -918,16 +910,10 @@ struct Solution {
             });
 
             int j = -1;
-            int j2 = -1;
             for (int cur_j: js) {
                 if (total_g[cur_j] + add_g[t][requests[cur_j].n] < requests[cur_j].TBS) {
-                    if (j == -1) {
-                        j = cur_j;
-                    } else if (j2 == -1) {
-                        j2 = cur_j;
-                    } else {
-                        break;
-                    }
+                    j = cur_j;
+                    break;
                 }
             }
 
@@ -969,8 +955,8 @@ struct Solution {
                 return true;
             };
 
-            if(!do_step(j) && !do_step(j2)){
-                break;
+            if(!do_step(j)){
+                //break;
             }
         }
 
