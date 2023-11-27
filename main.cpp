@@ -920,308 +920,402 @@ struct Solution {
         // что это значит? наверное мы хотим как можно больший прирост g
         // а также чтобы доотправлять сообщения
 
-        // state[k][r] = маска запросов, которые тут используются
-        vector<vector<uint64_t>> state(K, vector<uint64_t>(R));
-
-        mt19937 rnd(42);
-        auto build_random_state = [&]() {
+        for (int n = 0; n < N; n++) {
             for (int k = 0; k < K; k++) {
                 for (int r = 0; r < R; r++) {
-                    state[k][r] = 0;
-                }
-            }
-            for (int r = 0; r < R; r++) {
-                int x = int(rnd() % js.size());
-                for (int k = 0; k < K; k++) {
-                    state[k][r] = 1ULL << x;
-                }
-            }
-        };
-
-        auto f = [&]() { // NOLINT
-            double result = 0;
-            set_power_for_state(t, js, state);
-
-            for (int j: js) {
-                auto [TBS, n, t0, t1, ost_len] = requests[j];
-                add_g[t][n] = get_g(t, n);
-                if (add_g[t][n] + total_g[j] >= TBS) {
-                    result += 1e6;
-                    result -= log((total_g[j] + add_g[t][n]) - TBS + 1);
-                } else {
-                    result += -TBS + add_g[t][n];
-                }
-            }
-            return result;
-        };
-
-        auto f_with_change = [&](double cur_f, int k, int r, int bit) {
-            /*state[k][r] ^= (1ULL << bit);
-            {
-                for (int n = 0; n < N; n++) {
                     p[t][n][k][r] = 0;
                 }
-                {
-                    int count = __builtin_popcount(state[k][r]);
-                    for (int bit = 0; bit < js.size(); bit++) {
-                        if ((state[k][r] >> bit) & 1) {
-                            int j = js[bit];
-                            int n = requests[j].n;
-
-                            p[t][n][k][r] = 4.0 / count;
-                        }
-                    }
-                }
-
-                double sump = 0;
-                for (int r = 0; r < R; r++) {
-                    if (state[k][r] != 0) {
-                        sump += 4.0;
-                    }
-                }
-                for (int r = 0; r < R; r++) {
-                    for (int bit = 0; bit < js.size(); bit++) {
-                        if ((state[k][r] >> bit) & 1) {
-                            int j = js[bit];
-                            int n = requests[j].n;
-
-                            p[t][n][k][r] *= min(1.0, R / sump);
-                        }
-                    }
-                }
-                auto my_p = p;
-                set_power_for_state(t, js, state);
-                ASSERT(p == my_p, "failed");
             }
-            state[k][r] ^= (1ULL << bit);*/
+        }
 
-            // trivial
-            state[k][r] ^= (1ULL << bit);
-            cur_f = f();
-            state[k][r] ^= (1ULL << bit);
-
-            /*double result = 0;
-            state[k][r] ^= (1ULL << bit);
-            set_power_for_state(t, js, state);
-
-            int count = 0;
-            for (int j: js) {
-                auto [TBS, n, t0, t1, ost_len] = requests[j];
-                if(add_g[t][n] == get_g(t, n)){
-                    count++;
-                }
-                add_g[t][n] = get_g(t, n);
-                if (add_g[t][n] + total_g[j] >= TBS) {
-                    result += 1e5;
-                } else {
-                    result += add_g[t][n] - TBS;
-                }
-            }
-            cout << count << '/' << js.size() << endl;
-            ASSERT(f() == result, "fatal");
-
-            state[k][r] ^= (1ULL << bit);
-            return result;*/
-            return cur_f;
-        };
-
-        auto best_state = state;
-        double best_f = f();
-#ifdef PRINT_SEARCH_INFO
-        cout << best_f << "->";
-#endif
-
-/*
-TEST CASE==============
-0.999996/2 0.000104506s
-TEST CASE==============
-146.993/150 1.6815s
-TEST CASE==============
-694.998/829 14.5569s
-TEST CASE==============
-183.995/184 1.21331s
-*/
-
-/*
- * C:\Windows\system32\wsl.exe --distribution Ubuntu --exec /bin/bash -c "cd '/root/Deterministic Scheduling for Extended Reality over 5G and Beyond/Deterministic-Scheduling-for-Extended-Reality-over-5G-and-Beyond' && '/root/Deterministic Scheduling for Extended Reality over 5G and Beyond/Deterministic-Scheduling-for-Extended-Reality-over-5G-and-Beyond/solution'"
-TEST CASE==============
-TIME: 50
-score: 2/2
-1 1 1 1 1
-1 1 1 1 1
-1 1 1 1 1
-1 1 1 1 1
-TIME: 98
-score: 3/3
-2 1 1 1 1
-1 1 1 1 1
-1 1 1 1 1
-1 1 1 1 1
-TIME: 72
-score: 4/4
-1 0 0 0 0
-1 0 0 0 1
-1 1 1 1 1
-1 1 1 1 1
-TIME: 77
-score: 4/4
-0 1 1 1 1
-1 1 1 1 1
-1 1 1 1 1
-1 1 1 1 1
-TIME: 2
-score: 3/5
-2 1 0 0 0
-0 1 1 0 0
-0 1 1 1 2
-0 1 1 1 1
-TIME: 5
-score: 5/5
-1 1 1 1 0
-0 0 1 0 0
-1 1 1 1 0
-1 1 1 1 1
-TIME: 9
-score: 3/5
-2 1 1 0 0
-0 1 0 2 0
-0 1 1 0 0
-0 0 0 0 2
-TIME: 39
-score: 4/5
-2 1 1 0 0
-0 0 1 2 0
-1 0 1 0 2
-0 1 1 1 1
-TIME: 67
-score: 2/5
-1 1 1 1 1
-1 1 0 2 0
-1 1 1 1 1
-1 1 1 1 1
-TIME: 82
-score: 5/5
-1 2 2 0 2
-1 3 2 2 1
-1 2 2 2 1
-1 1 1 1 1
-TIME: 90
-score: 4/5
-1 1 1 2 1
-1 1 1 0 1
-2 1 1 0 1
-3 1 2 0 0
-TIME: 4
-score: 3/6
-0 1 1 1 1
-2 1 1 0 1
-0 1 1 1 1
-1 1 1 1 1
-TIME: 25
-score: 2/6
-1 2 0 1 0
-1 0 1 0 1
-1 1 1 1 1
-1 1 0 1 1
-*/
-
-        for(int step = 0; step < 10; step++){
-            build_random_state();
-            double cur_f = f();
-            bool run = true;
-            for (int kek = 0; kek < 1e9 && run; kek++) {
-                run = false;
-
-                for (int k = 0; k < K; k++) {
-                    for (int r = 0; r < R; r++) {
-                        for (int bit = 0; bit < js.size(); bit++) {
-                            int j = js[bit];
-                            auto [TBS, n, t0, t1, ost_len] = requests[j];
-
-                            double new_f = f_with_change(cur_f, k, r, bit);
-                            if (new_f > cur_f) {
-                                state[k][r] ^= (1ULL << bit);
-                                cur_f = new_f;
-                                run = true;
+        auto correct_build_dp_sum = [&]() {
+            // dp_sum[n][k][r]
+            vector<vector<vector<double>>> dp_sum(N, vector(K, vector<double>(R)));
+            for (int n = 0; n < N; n++) {
+                for (int m = 0; m < N; m++) {
+                    if (m != n) {
+                        for (int k = 0; k < K; k++) {
+                            for (int r = 0; r < R; r++) {
+                                dp_sum[n][k][r] += s0[t][n][k][r] * p[t][m][k][r] / exp_d[n][m][k][r];
                             }
                         }
                     }
                 }
+            }
+            return dp_sum;
+        };
+
+        auto correct_build_dp_sum_2 = [&]() {
+            vector<vector<double>> dp_sum_2(N, vector<double>(R));
+
+            auto dp_sum = correct_build_dp_sum();
+            for (int n = 0; n < N; n++) {
                 for (int k = 0; k < K; k++) {
                     for (int r = 0; r < R; r++) {
-                        for (int k2 = 0; k2 < K; k2++) {
-                            for (int r2 = 0; r2 < R; r2++) {
-                                for (int bit = 0; bit < js.size(); bit++) {
-                                    for (int bit2 = 0; bit2 < js.size(); bit2++) {
-                                        int j = js[bit];
-                                        int j2 = js[bit2];
+                        dp_sum_2[n][r] += dp_sum[n][k][r];
+                    }
+                }
+            }
+            return dp_sum_2;
+        };
 
-                                        state[k][r] ^= (1ULL << bit);
-                                        state[k2][r2] ^= (1ULL << bit2);
+        /*auto correct_build_dp_s0_p_d = [&]() {
+            // dp_s0_p_d[n][k][r]
+            vector<vector<vector<double>>> dp_s0_p_d(N, vector(K, vector<double>(R)));
 
-                                        double new_f = f();
-                                        if (new_f > cur_f) {
-                                            cur_f = new_f;
-                                            run = true;
-                                        } else {
-                                            state[k][r] ^= (1ULL << bit);
-                                            state[k2][r2] ^= (1ULL << bit2);
-                                        }
-                                    }
+            auto dp_sum = correct_build_dp_sum();
+            auto dp_sum_2 = correct_build_dp_sum_2();
+            for (int n = 0; n < N; n++) {
+                for (int k = 0; k < K; k++) {
+                    for (int r = 0; r < R; r++) {
+                        dp_s0_p_d[n][k][r] = 1 + dp_sum_2[n][r] - dp_sum[n][k][r];
+                    }
+                }
+            }
+            return dp_s0_p_d;
+        };*/
+
+        auto correct_build_dp_exp_d_prod = [&]() {
+            vector<vector<vector<double>>> dp_exp_d_prod(N, vector(K, vector<double>(R, 1)));
+            for (int n = 0; n < N; n++) {
+                for (int k = 0; k < K; k++) {
+                    for (int r = 0; r < R; r++) {
+                        for (int m = 0; m < N; m++) {
+                            if (n != m) {
+                                if (p[t][m][k][r] > 0) {
+                                    dp_exp_d_prod[n][k][r] *= exp_d_2[n][k][r][m];
                                 }
                             }
                         }
                     }
                 }
             }
+            return dp_exp_d_prod;
+        };
 
-            if (best_f < cur_f) {
-                best_f = cur_f;
-#ifdef PRINT_SEARCH_INFO
-                cout << best_f << "->";
-#endif
+        // dp_sum[n][k][r]
+        vector<vector<vector<double>>> dp_sum(N, vector(K, vector<double>(R)));
+
+        // dp_sum_2[n][r]
+        vector<vector<double>> dp_sum_2(N, vector<double>(R));
+
+        // dp_s0_p_d[n][k][r]
+        //vector<vector<vector<double>>> dp_s0_p_d(N, vector(K, vector<double>(R)));
+        /*for (int k = 0; k < K; k++) {
+            for (int r = 0; r < R; r++) {
+                dp_s0_p_d[k][r] = 1 + dp_sum_2[r] - dp_sum[k][r];
+            }
+        }*/
+
+        // dp_exp_d_prod[n][k][r]
+        vector<vector<vector<double>>> dp_exp_d_prod(N, vector(K, vector<double>(R, 1)));
+        /*for (int m = 0; m < N; m++) {
+            if (n != m) {
+                if (p[t][m][k][r] > 0) {
+                    accum_prod *= exp_d_2[n][k][r][m];
+                }
+            }
+        }*/
+
+        auto update_dynamics = [&](int n, int k, int r, double change) { // NOLINT
+            // TODO: порядок очень важен
+
+            for (int m = 0; m < N; m++) {
+                dp_sum_2[m][r] -= dp_sum[m][k][r];
+            }
+            for (int m = 0; m < N; m++) {
+                if (m != n) {
+                    dp_sum[m][k][r] -= s0[t][m][k][r] * p[t][n][k][r] / exp_d[m][n][k][r];
+                }
+            }
+
+            if (p[t][n][k][r] > 0) {
+                for (int m = 0; m < N; m++) {
+                    if (n != m) {
+                        dp_exp_d_prod[m][k][r] /= exp_d_2[n][k][r][m];
+                    }
+                }
+            }
+
+            // ====================
+            p[t][n][k][r] += change;
+            // ====================
+
+            if (p[t][n][k][r] > 0) {
+                for (int m = 0; m < N; m++) {
+                    if (n != m) {
+                        dp_exp_d_prod[m][k][r] *= exp_d_2[n][k][r][m];
+                    }
+                }
+            }
+
+            for (int m = 0; m < N; m++) {
+                if (m != n) {
+                    dp_sum[m][k][r] += s0[t][m][k][r] * p[t][n][k][r] / exp_d[m][n][k][r];
+                }
+            }
+
+            for (int m = 0; m < N; m++) {
+                dp_sum_2[m][r] += dp_sum[m][k][r];
+            }
+
+            // ====================
+            // VERIFY
+
+            auto correct_dp_sum = correct_build_dp_sum();
+            for (int n = 0; n < N; n++) {
+                for (int k = 0; k < K; k++) {
+                    for (int r = 0; r < R; r++) {
+                        if (abs(dp_sum[n][k][r] - correct_dp_sum[n][k][r]) > 1e-9) {
+                            //cout << fixed << setprecision(50);
+                            cout << "\n\nerror:\n" << abs(dp_sum[n][k][r] - correct_dp_sum[n][k][r]) << '\n'
+                                 << dp_sum[n][k][r] << '\n'
+                                 << correct_dp_sum[n][k][r] << endl;
+                            ASSERT(false, "failed");
+                        }
+                    }
+                }
+            }
+
+            auto correct_dp_sum_2 = correct_build_dp_sum_2();
+            for (int n = 0; n < N; n++) {
+                for (int r = 0; r < R; r++) {
+                    if (abs(dp_sum_2[n][r] - correct_dp_sum_2[n][r]) > 1e-9) {
+                        //cout << fixed << setprecision(50);
+                        cout << "\n\nerror:\n" << abs(dp_sum_2[n][r] - correct_dp_sum_2[n][r]) << '\n'
+                             << dp_sum_2[n][r] << '\n'
+                             << correct_dp_sum_2[n][r] << endl;
+                        ASSERT(false, "failed");
+                    }
+                }
+            }
+
+            auto correct_dp_exp_d_prod = correct_build_dp_exp_d_prod();
+            for (int n = 0; n < N; n++) {
+                for (int k = 0; k < K; k++) {
+                    for (int r = 0; r < R; r++) {
+                        if (abs(dp_exp_d_prod[n][k][r] - correct_dp_exp_d_prod[n][k][r]) > 1e-9) {
+                            //cout << fixed << setprecision(50);
+                            cout << "\n\nerror:\n" << abs(dp_exp_d_prod[n][k][r] - correct_dp_exp_d_prod[n][k][r]) << '\n'
+                                 << dp_exp_d_prod[n][k][r] << '\n'
+                                 << correct_dp_exp_d_prod[n][k][r] << endl;
+                            ASSERT(false, "failed");
+                        }
+                    }
+                }
+            }
+        };
+
+        auto fast_f = [&]() {
+            double result = 0;
+            for (int j: js) {
+                auto [TBS, n, t0, t1, ost_len] = requests[j];
+                add_g[t][n] = get_g(t, n);
+                if (add_g[t][n] + total_g[j] >= TBS) {
+                    result += 1e6;
+                } else {
+                    result += add_g[t][n];
+                }
+            }
+            return result;
+        };
+
+        auto correct_f = [&]() { // NOLINT
+            double result = 0;
+            for (int j: js) {
+                auto [TBS, n, t0, t1, ost_len] = requests[j];
+                add_g[t][n] = get_g(t, n);
+                if (add_g[t][n] + total_g[j] >= TBS) {
+                    result += 1e6;
+                } else {
+                    result += add_g[t][n];
+                }
+            }
+            return result;
+        };
+
+        auto calc_add_power = [&](int n, int k, int r) {
+            double add = 0.5;
+
+            {
+                double sum = 0;
+                for (int n = 0; n < N; n++) {
+                    sum += p[t][n][k][r];
+                }
+                add = min(add, 4 - sum);
+                ASSERT(sum <= 4, "fatal");
+            }
+
+            {
+                double sum = 0;
+                for (int r = 0; r < R; r++) {
+                    for (int n = 0; n < N; n++) {
+                        sum += p[t][n][k][r];
+                    }
+                }
+                add = min(add, R - sum);
+                ASSERT(sum <= R, "fatal");
+            }
+            return add;
+        };
+
+        // 653.999/829 3.48707s
+
+        //cout << f() << "->";
+
+        double best_f = correct_f();
+        ASSERT(fast_f() == correct_f(), "fatal");
+        while (true) {
+            cout << best_f << "->";
+            double cur_f = best_f;
+            int best_k = -1, best_r = -1, best_j = -1;
+            for (int k = 0; k < K; k++) {
+                for (int r = 0; r < R; r++) {
+                    for (int j: js) {
+                        auto [TBS, n, t0, t1, ost_len] = requests[j];
+
+                        // add power for p[t][n][k][r]
+                        double add = calc_add_power(n, k, r);
+
+                        if (add != 0) {
+                            double old_p = p[t][n][k][r];
+
+                            double new_f;
+                            {
+                                update_dynamics(n, k, r, add);
+                                new_f = fast_f();
+                                ASSERT(fast_f() == correct_f(), "fatal");
+                                update_dynamics(n, k, r, -add);
+                            }
+
+                            if (best_f < new_f) {
+                                //cout << f() << "->";
+                                best_f = new_f;
+                                best_k = k;
+                                best_r = r;
+                                best_j = j;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (best_k == -1) {
+                break;
+            }
+
+            int n = requests[best_j].n;
+            update_dynamics(n, best_k, best_r, calc_add_power(n, best_k, best_r));
+            //ASSERT(verify_power(t), "fatal");
+        }
+        cout << endl << endl;
+
+        ASSERT(verify_power(t), "fatal");
+
+        // без модернизаций и смотрим чисто на f 686.998/829 8.73603s
+        /*double best_f = f();
+        vector<vector<uint64_t>> best_state = state;
+
+        cout << f() << "->";
+        for(int step = 0; step < 100; step++){
+            // (weight, k, r, bit)
+            vector<tuple<double, int, int, int>> steps;
+            for (int bit = 0; bit < js.size(); bit++) {
+                int j = js[bit];
+                auto [TBS, n, t0, t1, ost_len] = requests[j];
+
+                // 669.998/829 6.1997s
+                if(get_g(t, n) + total_g[j] < TBS) {
+
+                    for (int k = 0; k < K; k++) {
+                        for (int r = 0; r < R; r++) {
+                            double weight = 0;
+                            double old_f = f();
+                            state[k][r] ^= (1ULL << bit);
+                            set_power_for_state(t, js, state);
+                            weight = get_g(t, n) - add_g[t][n];
+                            //weight = f() - old_f;
+                            state[k][r] ^= (1ULL << bit);
+                            steps.emplace_back(weight, k, r, bit);
+                            //cout << weight << ' ';
+                        }
+                        //cout << '\n';
+                    }
+                }
+                //cout << "=============\n";
+            }
+            sort(steps.begin(), steps.end(), greater<>());
+
+            bool ok = true;
+            for (auto [weight, k, r, bit]: steps) {
+                if(weight <= 0){
+                    ok = false;
+                    break;
+                }
+                state[k][r] ^= (1ULL << bit);
+                f();
+                break;
+            }
+            cout << f() << "->";
+            cout.flush();
+            if(!ok || steps.empty()){
+                break;
+            }
+
+            if(f() > best_f){
+                best_f = f();
                 best_state = state;
             }
         }
-        set_power_for_state(t, js, best_state);
+        cout << endl << endl;
 
-        static ofstream output("log.txt");
+        state = best_state;
+        set_power_for_state(t, js, state);*/
 
-        output << "==========\n";
-        output << "==========\n";
-        output << "TIME: " << t << '\n';
-        int count_accepted = 0;
-        for (int j: js) {
-            auto [TBS, n, t0, t1, ost_len] = requests[j];
-            if (add_g[t][n] + total_g[j] >= TBS) {
-                count_accepted++;
+        /*{
+            static ofstream output("log.txt");
+
+            output << "==========\n";
+            output << "==========\n";
+            output << "TIME: " << t << '\n';
+            int count_accepted = 0;
+            for (int j: js) {
+                auto [TBS, n, t0, t1, ost_len] = requests[j];
+                if (get_g(t, n) + total_g[j] >= TBS) {
+                    count_accepted++;
+                }
             }
-        }
-        output << "score: " << count_accepted << "/" << js.size() << endl;
-        output << "==========\n";
-        output << "counts:\n";
-        for (int k = 0; k < K; k++) {
-            for (int r = 0; r < R; r++) {
-                output << __builtin_popcountll(state[k][r]) << ' ';
-            }
-            output << '\n';
-        }
-        output << "==========\n";
-        for(int bit = 0; bit < js.size(); bit++) {
+            output << "score: " << count_accepted << "/" << js.size() << endl;
+            output << "==========\n";
+            output << "counts:\n";
             for (int k = 0; k < K; k++) {
                 for (int r = 0; r < R; r++) {
-                    output << ((state[k][r] >> bit) & 1) << ' ';
+                    int count = 0;
+                    for(int n = 0; n < N; n++){
+                        count += p[t][n][k][r] > 0;
+                    }
+                    output << count << ' ';
                 }
                 output << '\n';
             }
             output << "==========\n";
-        }
-        output.flush();
+            for (int bit = 0; bit < js.size(); bit++) {
+                int n = requests[js[bit]].n;
+                for (int k = 0; k < K; k++) {
+                    for (int r = 0; r < R; r++) {
+                        output << (p[t][n][k][r] > 0) << ' ';
+                    }
+                    output << '\n';
+                }
+                output << "==========\n";
+            }
+            output.flush();
 
 #ifdef PRINT_SEARCH_INFO
-        cout << endl;
+            cout << endl;
         cout << "score: " << get_score() << endl;
 #endif
+        }*/
     }
 
     void solve() {
@@ -1257,6 +1351,10 @@ score: 2/6
 
         for (int step = 0; step < T; step++) {
             // выберем самое лучшее время, куда наиболее оптимально поставим силу
+
+            // TODO: for tests
+            //set_nice_power(81, js[81]);
+            //exit(0);
 
             int best_time = -1;
             {
