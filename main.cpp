@@ -514,6 +514,10 @@ struct Solution {
     }
 
     void set_nice_power(int t, vector<int> js) {
+        if (js.empty()) {
+            return;
+        }
+
         // наиболее оптимально расставить силу так
         // что это значит? наверное мы хотим как можно больший прирост g
         // а также чтобы доотправлять сообщения
@@ -887,7 +891,7 @@ struct Solution {
 #endif
         const int STEPS = 1e9;
 
-        vector<double> weight(J);
+        /*vector<double> weight(J);
         for (int j: js) {
             auto [TBS, n, t0, t1, ost_len] = requests[j];
             for (int k = 0; k < K; k++) {
@@ -901,12 +905,12 @@ struct Solution {
                     }
                 }
             }
-        }
+        }*/
 
-        for (int step = 0; step < STEPS && !js.empty(); step++) {
+        for (int step = 0; step < STEPS; step++) {
             auto foo = [&](int j) {
                 auto [TBS, n, t0, t1, ost_len] = requests[j];
-                return TBS - (total_g[j] + add_g[t][n]) - weight[j] / 10;
+                return TBS - (total_g[j] + add_g[t][n]);// - weight[j] / 10;
             };
 
             sort(js.begin(), js.end(), [&](int lhs, int rhs) {
@@ -914,80 +918,65 @@ struct Solution {
             });
 
             int j = -1;
-            int j1 = -1;
-            for (int j2: js) {
-                if (total_g[j2] + add_g[t][requests[j2].n] < requests[j2].TBS) {
-                    /*if(j == -1){
-                        j = j2;
-                    }
-                    else if(j1 == -1){
-                        j1 = j2;
-                    }*/
-                    j = j2;
-                    break;
-                }
-            }
-            if (j == -1) {
-                break;
-            }
-            auto [TBS, n, t0, t1, ost_len] = requests[j];
-            if (total_g[j] + add_g[t][n] >= TBS) {
-                ASSERT(false, "kek");
-            }
-
-            int best_k = -1;
-            int best_r = -1;
-            bool is_add = true;
-            for (int k = 0; k < K; k++) {
-                for (int r = 0; r < R; r++) {
-                    // add power for p[t][n][k][r]
-                    double add = calc_add_power(n, k, r);
-
-                    if (add > 1e-9) {
-                        update_dynamics(n, k, r, add);
-                        double new_f = fast_f();
-                        update_dynamics(n, k, r, -add);
-
-                        if (best_f < new_f) {
-                            best_f = new_f;
-                            best_k = k;
-                            best_r = r;
-                            is_add = true;
-                        }
-                    }
-
-                    {
-                        double sub = -p[t][n][k][r] / 2;
-                        update_dynamics(n, k, r, sub);
-                        double new_f = fast_f();
-                        update_dynamics(n, k, r, -sub);
-
-                        if (best_f < new_f) {
-                            best_f = new_f;
-                            best_k = k;
-                            best_r = r;
-                            is_add = false;
-                        }
+            int j2 = -1;
+            for (int cur_j: js) {
+                if (total_g[cur_j] + add_g[t][requests[cur_j].n] < requests[cur_j].TBS) {
+                    if (j == -1) {
+                        j = cur_j;
+                    } else if (j2 == -1) {
+                        j2 = cur_j;
+                    } else {
+                        break;
                     }
                 }
             }
 
-            if (best_k == -1) {
-                break;
-            }
+            auto do_step = [&](int j) {
+                if (j == -1) {
+                    return false;
+                }
+                auto [TBS, n, t0, t1, ost_len] = requests[j];
+                if (total_g[j] + add_g[t][n] >= TBS) {
+                    return false;
+                }
 
-            if (is_add) {
+                int best_k = -1;
+                int best_r = -1;
+                for (int k = 0; k < K; k++) {
+                    for (int r = 0; r < R; r++) {
+                        double add = calc_add_power(n, k, r);
+
+                        if (add > 1e-9) {
+                            update_dynamics(n, k, r, add);
+                            double new_f = fast_f();
+                            update_dynamics(n, k, r, -add);
+
+                            if (best_f < new_f) {
+                                best_f = new_f;
+                                best_k = k;
+                                best_r = r;
+                            }
+                        }
+                    }
+                }
+
+                if (best_k == -1) {
+                    return false;
+                }
+
                 update_dynamics(n, best_k, best_r, calc_add_power(n, best_k, best_r));
-            } else {
-                double sub = -p[t][n][best_k][best_r] / 2;
-                update_dynamics(n, best_k, best_r, sub);
+                fast_f();
+                return true;
+            };
+
+            if(!do_step(j) && !do_step(j2)){
+                break;
             }
-            fast_f();
         }
 
         // update total_g[j]
         fast_f(); /// for update add_g[t][n]!!!
-        for(int j : js){
+        for (int j: js) {
             int n = requests[j].n;
             total_g[j] += add_g[t][n];
         }
@@ -1200,40 +1189,40 @@ int main() {
         }
         cout << "TEST CASE==============\n";
 #endif
-        //std::ios::sync_with_stdio(false);
-        //std::cin.tie(0);
-        //std::cout.tie(0);
+    //std::ios::sync_with_stdio(false);
+    //std::cin.tie(0);
+    //std::cout.tie(0);
 
-        Solution solution;
+    Solution solution;
 #ifdef FAST_STREAM
-        solution.read();
+    solution.read();
 #else
-        solution.read(input);
+    solution.read(input);
         auto time_start = steady_clock::now();
 #endif
 
-        solution.solve();
-        /*Solution solution2 = solution;
+    solution.solve();
+    /*Solution solution2 = solution;
 
-        solution2.use_build_weight_version = Solution::ONCE_IN_R;
-        solution.use_build_weight_version = Solution::ALL;
+    solution2.use_build_weight_version = Solution::ONCE_IN_R;
+    solution.use_build_weight_version = Solution::ALL;
 
-        solution.solve();
-        solution2.solve();
+    solution.solve();
+    solution2.solve();
 
-        if (solution.get_score() < solution2.get_score()) {
-            solution = solution2;
-        }*/
+    if (solution.get_score() < solution2.get_score()) {
+        solution = solution2;
+    }*/
 
 #ifndef FAST_STREAM
-        auto time_stop = steady_clock::now();
+    auto time_stop = steady_clock::now();
         auto duration = time_stop - time_start;
         double time = duration_cast<nanoseconds>(duration).count() / 1e9;
         cout << solution.get_score() << '/' << solution.J << ' ' << time << "s" << endl;
 #endif
 
 #ifdef FAST_STREAM
-        solution.print();
+    solution.print();
 #endif
 
 #ifndef FAST_STREAM
