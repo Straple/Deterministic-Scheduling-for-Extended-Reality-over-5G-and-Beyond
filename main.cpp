@@ -878,6 +878,15 @@ struct Solution {
         return set_of_weights;
     }
 
+    //TEST CASE==============
+    //2/2 4.1903e-05s
+    //TEST CASE==============
+    //142.994/150 0.093205s
+    //TEST CASE==============
+    //665.999/829 0.124275s
+    //TEST CASE==============
+    //184/184 0.0332196s
+
     void deterministic_descent(int t, vector<int> js) {
         map<int, int> n_to_j;
         for (int j: js) {
@@ -1197,7 +1206,7 @@ struct Solution {
                     x += add_g[t][n] - TBS;
                 }
                 ASSERT(ost_len != 0, "ost_len is zero, why?");
-                //x *= 1.0 / ost_len;
+                x *= 1.0 / ost_len;
                 result += x;
             }
             return result;
@@ -1227,7 +1236,7 @@ struct Solution {
                     x += add_g[t][n] - TBS;
                 }
                 ASSERT(ost_len != 0, "ost_len is zero, why?");
-                //x *= 1.0 / ost_len;
+                x *= 1.0 / ost_len;
                 result += x;
             }
 
@@ -1431,7 +1440,7 @@ struct Solution {
             }
         }
 
-        /*{
+        {
             for (int j: js) {
                 minimize_power(t, j);
             }
@@ -1470,10 +1479,10 @@ struct Solution {
                     mult_power(t, n, factor);
                 }
             }
-        }*/
+        }
 
         // update total_g[j]
-        fast_f(); /// for update add_g[t][n]!!!
+        //fast_f(); /// for update add_g[t][n]!!!
     }
 
     void set_nice_power(int t, vector<int> js) {
@@ -1489,10 +1498,10 @@ struct Solution {
             double score = 0;
             for (int j: js) {
                 auto [TBS, n, t0, t1, ost_len] = requests[j];
-                if(total_g[j] + add_g[t][n] >= TBS){
+                add_g[t][n] = get_g(t, n);
+                if (total_g[j] + add_g[t][n] >= TBS) {
                     score += 10;
-                }
-                else{
+                } else {
                     score += add_g[t][n] / TBS;
                 }
             }
@@ -1508,15 +1517,6 @@ struct Solution {
         }
 
         //deterministic_descent(t, js);
-
-        //TEST CASE==============
-        //2/2 7.9922e-05s
-        //TEST CASE==============
-        //145.993/150 0.0420034s
-        //TEST CASE==============
-        //535.998/829 0.325464s
-        //TEST CASE==============
-        //183.995/184 0.0492792s
 
         set_power(t, build_weights_of_power(t, js));
         deterministic_descent(t, js);
@@ -1768,29 +1768,29 @@ int main() {
         }
         cout << "TEST CASE==============\n";
 #endif
-        //std::ios::sync_with_stdio(false);
-        //std::cin.tie(0);
-        //std::cout.tie(0);
+    //std::ios::sync_with_stdio(false);
+    //std::cin.tie(0);
+    //std::cout.tie(0);
 
-        Solution solution;
+    Solution solution;
 #ifdef FAST_STREAM
-        solution.read();
+    solution.read();
 #else
-        solution.read(input);
-        auto time_start = steady_clock::now();
+    solution.read(input);
+    auto time_start = steady_clock::now();
 #endif
 
-        solution.solve();
+    solution.solve();
 
 #ifndef FAST_STREAM
-        auto time_stop = steady_clock::now();
-        auto duration = time_stop - time_start;
-        double time = duration_cast<nanoseconds>(duration).count() / 1e9;
-        cout << solution.get_score() << '/' << solution.J << ' ' << time << "s" << endl;
+    auto time_stop = steady_clock::now();
+    auto duration = time_stop - time_start;
+    double time = duration_cast<nanoseconds>(duration).count() / 1e9;
+    cout << solution.get_score() << '/' << solution.J << ' ' << time << "s" << endl;
 #endif
 
 #ifdef FAST_STREAM
-        solution.print();
+    solution.print();
 #endif
 
 #ifndef FAST_STREAM
