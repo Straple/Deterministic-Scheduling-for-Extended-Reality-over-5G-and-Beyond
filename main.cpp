@@ -878,15 +878,6 @@ struct Solution {
         return set_of_weights;
     }
 
-    //TEST CASE==============
-    //2/2 4.1903e-05s
-    //TEST CASE==============
-    //142.994/150 0.093205s
-    //TEST CASE==============
-    //665.999/829 0.124275s
-    //TEST CASE==============
-    //184/184 0.0332196s
-
     void deterministic_descent(int t, vector<int> js) {
         map<int, int> n_to_j;
         for (int j: js) {
@@ -991,7 +982,7 @@ struct Solution {
         };
 
         auto correct_build_dp_denom_sum = [&]() {
-            vector<vector<vector<double>>> dp_denom_sum(N, vector(K, vector<double>(R, 1)));
+            vector<vector<vector<double>>> dp_denom_sum(N, vector(K, vector<double>(R)));
             auto dp_sum = correct_build_dp_sum();
             auto dp_sum_2 = correct_build_dp_sum_2();
             for (int n = 0; n < N; n++) {
@@ -1038,6 +1029,9 @@ struct Solution {
         dp_accum_prod = correct_build_dp_accum_prod();
         dp_exp_d_prod = correct_build_dp_exp_d_prod();
         dp_denom_sum = correct_build_dp_denom_sum();
+        dp_denom_sum_global_add.assign(N, vector<double>(R));
+
+        vector<double> request_weight(J, 1);
 
         auto update_dynamics = [&](int n, int k, int r, double change) { // NOLINT
             // TODO: порядок очень важен
@@ -1149,6 +1143,34 @@ struct Solution {
                 }
             }
 
+            auto correct_dp_count = correct_build_dp_count();
+            for (int n: nms) {
+                for (int k = 0; k < K; k++) {
+                    if (dp_count[n][k] != correct_dp_count[n][k]) {
+                        ASSERT(false, "failed");
+                    }
+                }
+            }
+
+            auto correct_dp_denom_sum = correct_build_dp_denom_sum();
+            // (dp_denom_sum[m][k][r] + dp_denom_sum_global_add[m][r])
+            for (int n: nms) {
+                for (int k = 0; k < K; k++) {
+                    for (int r = 0; r < R; r++) {
+                        ASSERT(!is_spoiled(dp_prod[n][k][r]), "fatal");
+                        double my_denom_sum = (dp_denom_sum[n][k][r] + dp_denom_sum_global_add[n][r]);
+                        if (!high_equal(my_denom_sum, correct_dp_denom_sum[n][k][r])) {
+                            //cout << fixed << setprecision(50);
+                            cout << "\n\nerror:\n" << abs(my_denom_sum - correct_dp_denom_sum[n][k][r])
+                                 << '\n'
+                                 << my_denom_sum << '\n'
+                                 << correct_dp_denom_sum[n][k][r] << endl;
+                            ASSERT(false, "failed");
+                        }
+                    }
+                }
+            }
+
             auto correct_dp_prod = correct_build_dp_prod();
             for (int n: nms) {
                 for (int k = 0; k < K; k++) {
@@ -1182,15 +1204,6 @@ struct Solution {
 
                 }
             }
-
-            auto correct_dp_count = correct_build_dp_count();
-            for (int n: nms) {
-                for (int k = 0; k < K; k++) {
-                    if (dp_count[n][k] != correct_dp_count[n][k]) {
-                        ASSERT(false, "failed");
-                    }
-                }
-            }
 #endif
         };
 
@@ -1207,6 +1220,7 @@ struct Solution {
                 }
                 ASSERT(ost_len != 0, "ost_len is zero, why?");
                 x *= 1.0 / ost_len;
+                x *= request_weight[j];
                 result += x;
             }
             return result;
@@ -1237,6 +1251,7 @@ struct Solution {
                 }
                 ASSERT(ost_len != 0, "ost_len is zero, why?");
                 x *= 1.0 / ost_len;
+                x *= request_weight[j];
                 result += x;
             }
 
@@ -1273,6 +1288,9 @@ struct Solution {
                 add = min(add, R - sum);
                 ASSERT(sum <= R + 1e-9, "fatal");
             }
+            if (add < 1e-9) {
+                add = 0;
+            }
             return add;
         };
 
@@ -1288,7 +1306,36 @@ struct Solution {
                 if (n != m) {
                     if (p[t][m][k][r] > take_power) {
                         int j = n_to_j[m];
-                        kek.emplace_back((total_g[j] + add_g[t][m]) - requests[j].TBS, m);
+                        // kek.emplace_back((total_g[j] + add_g[t][m]) - requests[j].TBS, m); // 16067.854 points
+                        // TODO: рассматривать add_g[t][n] / sum_power
+                        // типа то, сколько мы получаем g за единицу вложенной силы
+
+                        /*double sum_power = 0;
+                        for(int k = 0; k < K; k++){
+                            for(int r =0; r < R; r++){
+                                sum_power += p[t][m][k][r];
+                            }
+                        }
+                        if(sum_power == 0){
+                            sum_power = 1;
+                        }*/
+
+                        //kek.emplace_back(0.5 * (total_g[j] + add_g[t][m]) / requests[j].TBS +
+                        //                 add_g[t][m] / sum_power, m);
+
+                        //kek.emplace_back(2 * (total_g[j] + add_g[t][m]) / requests[j].TBS +
+                        //                 add_g[t][m] / sum_power, m); // 16027.854 points
+
+                        //kek.emplace_back((total_g[j] + add_g[t][m]) / requests[j].TBS +
+                        //add_g[t][m] / sum_power, m); // 16025.854 points
+
+                        //kek.emplace_back((total_g[j] + add_g[t][m]) / requests[j].TBS, m);// 16064.854 points
+                        //kek.emplace_back(add_g[t][m] - requests[j].TBS, m); // 16067.854 points
+                        //kek.emplace_back(add_g[t][m], m); // 16006.854 points
+                        // kek.emplace_back(-add_g[t][m] / sum_power, m); // 15957.855 points
+                        // kek.emplace_back(add_g[t][m] / sum_power, m); // 16024.854 points
+
+                        kek.emplace_back(add_g[t][m] - requests[j].TBS, m);
                     }
                 }
             }
@@ -1325,122 +1372,179 @@ struct Solution {
 #endif
         const int STEPS = 1e9;
 
-        for (int step = 0; step < STEPS && !js.empty(); step++) {
-            auto foo = [&](int j) {
-                auto [TBS, n, t0, t1, ost_len] = requests[j];
-                return TBS - (total_g[j] + add_g[t][n]);
-            };
-
-            sort(js.begin(), js.end(), [&](int lhs, int rhs) {
-                return foo(lhs) < foo(rhs);
-            });
-
-            int j = -1;
-            for (int cur_j: js) {
-                if (total_g[cur_j] + add_g[t][requests[cur_j].n] < requests[cur_j].TBS) {
-                    j = cur_j;
-                    break;
-                }
+        auto do_step = [&](int j) { // NOLINT
+            if (j == -1) {
+                return false;
+            }
+            auto [TBS, n, t0, t1, ost_len] = requests[j];
+            if (total_g[j] + add_g[t][n] >= TBS) {
+                return false;
             }
 
-            auto do_step = [&](int j) { // NOLINT
-                if (j == -1) {
-                    return false;
-                }
-                auto [TBS, n, t0, t1, ost_len] = requests[j];
-                if (total_g[j] + add_g[t][n] >= TBS) {
-                    return false;
-                }
+            int best_m = -1;
+            int best_k = -1;
+            int best_r = -1;
+            double best_add = 0;
+            for (int k = 0; k < K; k++) {
+                for (int r = 0; r < R; r++) {
+                    // try to add
+                    {
+                        double add = calc_add_power(k, r);
 
-                int best_m = -1;
-                int best_k = -1;
-                int best_r = -1;
-                double best_add = 0;
-                for (int k = 0; k < K; k++) {
-                    for (int r = 0; r < R; r++) {
-                        // try to add
-                        {
-                            double add = calc_add_power(k, r);
+                        if (add != 0) {
+                            update_dynamics(n, k, r, +add);
+                            double new_f = fast_f();
+                            update_dynamics(n, k, r, -add);
+                            fast_f();
 
-                            if (add > 0) {
-                                update_dynamics(n, k, r, +add);
-                                double new_f = fast_f();
-                                update_dynamics(n, k, r, -add);
-                                fast_f();
-
-                                if (best_f < new_f) {
-                                    best_add = add;
-                                    best_m = -1;
-                                    best_f = new_f;
-                                    best_k = k;
-                                    best_r = r;
-                                }
+                            if (best_f < new_f) {
+                                best_add = add;
+                                best_m = -1;
+                                best_f = new_f;
+                                best_k = k;
+                                best_r = r;
                             }
                         }
+                    }
 
-                        // try to take away
-                        {
-                            auto [new_f, take_power, m] = RobinHood(n, k, r);
-                            if (m != -1) {
-                                if (best_f < new_f) {
-                                    best_add = take_power;
-                                    best_m = m;
-                                    best_f = new_f;
-                                    best_k = k;
-                                    best_r = r;
-                                }
+                    // try to take away
+                    {
+                        auto [new_f, take_power, m] = RobinHood(n, k, r);
+                        if (m != -1) {
+                            if (best_f < new_f) {
+                                best_add = take_power;
+                                best_m = m;
+                                best_f = new_f;
+                                best_k = k;
+                                best_r = r;
                             }
                         }
+                    }
 
-                        // try to set zero
-                        {
-                            if (p[t][n][k][r] > 0) {
-                                double x = p[t][n][k][r];
-                                update_dynamics(n, k, r, -x);
-                                double new_f = fast_f();
-                                update_dynamics(n, k, r, +x);
-                                fast_f();
+                    // try to set zero
+                    {
+                        if (p[t][n][k][r] > 0) {
+                            double x = p[t][n][k][r];
+                            update_dynamics(n, k, r, -x);
+                            double new_f = fast_f();
+                            update_dynamics(n, k, r, +x);
+                            fast_f();
 
-                                if (best_f < new_f) {
-                                    best_add = -x;
-                                    best_m = -1;
-                                    best_f = new_f;
-                                    best_k = k;
-                                    best_r = r;
-                                }
+                            if (best_f < new_f) {
+                                best_add = -x;
+                                best_m = -1;
+                                best_f = new_f;
+                                best_k = k;
+                                best_r = r;
                             }
                         }
                     }
                 }
-
-                if (best_m != -1) {
-                    // take away
-                    update_dynamics(best_m, best_k, best_r, -best_add);
-                    update_dynamics(n, best_k, best_r, +best_add);
-                    ASSERT(verify_power(t), "failed power");
-                } else if (best_k != -1) {
-                    // add power
-                    //cout << best_add << endl;
-                    //if(best_add < 0){
-                    //cout << best_add << endl;
-                    //}
-                    update_dynamics(n, best_k, best_r, best_add);
-                    ASSERT(verify_power(t), "failed power");
-                } else {
-                    /// тут можно не обновлять add_g[t][n], так как мы просто ничего не делали
-                    /// fast_f(); /// for update add_g[t][n] after update dynamics
-                    return false;
-                }
-                fast_f(); /// for update add_g[t][n] after update dynamics
-                return true;
-            };
-
-            if (!do_step(j)) {
-                break;
             }
+
+            if (best_m != -1) {
+                // Robin Hood
+                update_dynamics(best_m, best_k, best_r, -best_add);
+                update_dynamics(n, best_k, best_r, +best_add);
+                ASSERT(verify_power(t), "failed power");
+            } else if (best_k != -1) {
+                // add power
+                update_dynamics(n, best_k, best_r, best_add);
+                ASSERT(verify_power(t), "failed power");
+            } else {
+                /// тут можно не обновлять add_g[t][n], так как мы просто ничего не делали
+                /// fast_f(); /// for update add_g[t][n] after update dynamics
+                return false;
+            }
+            fast_f(); /// for update add_g[t][n] after update dynamics
+            return true;
+        };
+
+        constexpr int SEARCH_STEPS = 4;
+        for (int search_step = 0; search_step < SEARCH_STEPS; search_step++) {
+            for (int step = 0; step < STEPS && !js.empty(); step++) {
+                auto foo = [&](int j) {
+                    auto [TBS, n, t0, t1, ost_len] = requests[j];
+                    return TBS - (total_g[j] + add_g[t][n]);
+                };
+
+                sort(js.begin(), js.end(), [&](int lhs, int rhs) {
+                    return foo(lhs) < foo(rhs);
+                });
+
+                int j = -1;
+                for (int cur_j: js) {
+                    if (total_g[cur_j] + add_g[t][requests[cur_j].n] < requests[cur_j].TBS) {
+                        j = cur_j;
+                        break;
+                    }
+                }
+
+                if (!do_step(j)) {
+                    break;
+                }
+            }
+
+            if (search_step + 1 != SEARCH_STEPS) {
+                // возьмем тех, кто тратит лишнюю силу, которую мы бы хотели отдать другим
+
+                //TEST CASE==============
+                //2/2 5.0869e-05s
+                //TEST CASE==============
+                //142.994/150 0.1289s
+                //TEST CASE==============
+                //665.999/829 0.369366s
+                //TEST CASE==============
+                //184/184 0.0794744s
+
+                vector<tuple<double, int>> kek;
+                for (int j: js) {
+                    auto [TBS, n, t0, t1, ost_len] = requests[j];
+                    if (total_g[j] + add_g[t][n] < TBS) {
+                        // невыполненный запрос
+                        // вроде найс: -add_g[t][n] + TBS
+                        kek.emplace_back(-add_g[t][n] + TBS - sum_power(t, n), j);
+                    }
+                }
+                sort(kek.begin(), kek.end());
+                const int KEK_SZ = 5;//(int)kek.size() / 2;
+                while ((int) kek.size() > KEK_SZ) {
+                    kek.pop_back();
+                }
+                for (auto [weight, j]: kek) {
+                    auto [TBS, n, t0, t1, ost_len] = requests[j];
+                    request_weight[j] *= 0.1;
+                    for (int k = 0; k < K; k++) {
+                        for (int r = 0; r < R; r++) {
+                            p[t][n][k][r] = 0;
+                        }
+                    }
+                }
+
+                for (int j: js) {
+                    request_weight[j] *= 1.1;
+                }
+
+                dp_count = correct_build_dp_count();
+                dp_prod = correct_build_dp_prod();
+                dp_accum_prod = correct_build_dp_accum_prod();
+                dp_exp_d_prod = correct_build_dp_exp_d_prod();
+                dp_denom_sum = correct_build_dp_denom_sum();
+                dp_denom_sum_global_add.assign(N, vector<double>(R));
+                best_f = fast_f();
+            }
+
+            /*dp_count = correct_build_dp_count();
+            dp_prod = correct_build_dp_prod();
+            dp_accum_prod = correct_build_dp_accum_prod();
+            dp_exp_d_prod = correct_build_dp_exp_d_prod();
+            dp_denom_sum = correct_build_dp_denom_sum();
+            dp_denom_sum_global_add.assign(N, vector<double>(R));
+            best_f = fast_f();*/
         }
 
-        {
+        /*
+         {
             for (int j: js) {
                 minimize_power(t, j);
             }
@@ -1479,7 +1583,7 @@ struct Solution {
                     mult_power(t, n, factor);
                 }
             }
-        }
+        }*/
 
         // update total_g[j]
         //fast_f(); /// for update add_g[t][n]!!!
@@ -1516,9 +1620,9 @@ struct Solution {
             }
         }
 
-        //deterministic_descent(t, js);
+        deterministic_descent(t, js);
 
-        set_power(t, build_weights_of_power(t, js));
+        /*set_power(t, build_weights_of_power(t, js));
         deterministic_descent(t, js);
         double scoreA = get_score_in_time();
         auto powerA = power_snapshot(t);
@@ -1537,7 +1641,7 @@ struct Solution {
 
         if(scoreA > scoreB){
             set_power(t, powerA);
-        }
+        }*/
 
         for (int j: js) {
             int n = requests[j].n;
