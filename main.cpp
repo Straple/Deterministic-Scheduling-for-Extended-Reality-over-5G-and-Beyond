@@ -1031,8 +1031,6 @@ struct Solution {
         dp_denom_sum = correct_build_dp_denom_sum();
         dp_denom_sum_global_add.assign(N, vector<double>(R));
 
-        vector<double> request_weight(J, 1);
-
         auto update_dynamics = [&](int n, int k, int r, double change) { // NOLINT
             // TODO: порядок очень важен
 
@@ -1220,7 +1218,6 @@ struct Solution {
                 }
                 ASSERT(ost_len != 0, "ost_len is zero, why?");
                 x *= 1.0 / ost_len;
-                x *= request_weight[j];
                 result += x;
             }
             return result;
@@ -1251,7 +1248,6 @@ struct Solution {
                 }
                 ASSERT(ost_len != 0, "ost_len is zero, why?");
                 x *= 1.0 / ost_len;
-                x *= request_weight[j];
                 result += x;
             }
 
@@ -1460,87 +1456,27 @@ struct Solution {
             return true;
         };
 
-        constexpr int SEARCH_STEPS = 4;
-        for (int search_step = 0; search_step < SEARCH_STEPS; search_step++) {
-            for (int step = 0; step < STEPS && !js.empty(); step++) {
-                auto foo = [&](int j) {
-                    auto [TBS, n, t0, t1, ost_len] = requests[j];
-                    return TBS - (total_g[j] + add_g[t][n]);
-                };
+        for (int step = 0; step < STEPS && !js.empty(); step++) {
+            auto foo = [&](int j) {
+                auto [TBS, n, t0, t1, ost_len] = requests[j];
+                return TBS - (total_g[j] + add_g[t][n]);
+            };
 
-                sort(js.begin(), js.end(), [&](int lhs, int rhs) {
-                    return foo(lhs) < foo(rhs);
-                });
+            sort(js.begin(), js.end(), [&](int lhs, int rhs) {
+                return foo(lhs) < foo(rhs);
+            });
 
-                int j = -1;
-                for (int cur_j: js) {
-                    if (total_g[cur_j] + add_g[t][requests[cur_j].n] < requests[cur_j].TBS) {
-                        j = cur_j;
-                        break;
-                    }
-                }
-
-                if (!do_step(j)) {
+            int j = -1;
+            for (int cur_j: js) {
+                if (total_g[cur_j] + add_g[t][requests[cur_j].n] < requests[cur_j].TBS) {
+                    j = cur_j;
                     break;
                 }
             }
 
-            if (search_step + 1 != SEARCH_STEPS) {
-                // возьмем тех, кто тратит лишнюю силу, которую мы бы хотели отдать другим
-
-                //TEST CASE==============
-                //2/2 5.0869e-05s
-                //TEST CASE==============
-                //142.994/150 0.1289s
-                //TEST CASE==============
-                //665.999/829 0.369366s
-                //TEST CASE==============
-                //184/184 0.0794744s
-
-                vector<tuple<double, int>> kek;
-                for (int j: js) {
-                    auto [TBS, n, t0, t1, ost_len] = requests[j];
-                    if (total_g[j] + add_g[t][n] < TBS) {
-                        // невыполненный запрос
-                        // вроде найс: -add_g[t][n] + TBS
-                        kek.emplace_back(-add_g[t][n] + TBS - sum_power(t, n), j);
-                    }
-                }
-                sort(kek.begin(), kek.end());
-                const int KEK_SZ = 5;//(int)kek.size() / 2;
-                while ((int) kek.size() > KEK_SZ) {
-                    kek.pop_back();
-                }
-                for (auto [weight, j]: kek) {
-                    auto [TBS, n, t0, t1, ost_len] = requests[j];
-                    request_weight[j] *= 0.1;
-                    for (int k = 0; k < K; k++) {
-                        for (int r = 0; r < R; r++) {
-                            p[t][n][k][r] = 0;
-                        }
-                    }
-                }
-
-                for (int j: js) {
-                    request_weight[j] *= 1.1;
-                }
-
-                dp_count = correct_build_dp_count();
-                dp_prod = correct_build_dp_prod();
-                dp_accum_prod = correct_build_dp_accum_prod();
-                dp_exp_d_prod = correct_build_dp_exp_d_prod();
-                dp_denom_sum = correct_build_dp_denom_sum();
-                dp_denom_sum_global_add.assign(N, vector<double>(R));
-                best_f = fast_f();
+            if (!do_step(j)) {
+                break;
             }
-
-            /*dp_count = correct_build_dp_count();
-            dp_prod = correct_build_dp_prod();
-            dp_accum_prod = correct_build_dp_accum_prod();
-            dp_exp_d_prod = correct_build_dp_exp_d_prod();
-            dp_denom_sum = correct_build_dp_denom_sum();
-            dp_denom_sum_global_add.assign(N, vector<double>(R));
-            best_f = fast_f();*/
         }
 
         /*
