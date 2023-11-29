@@ -1263,8 +1263,11 @@ struct Solution {
             return result;
         };
 
+        double add_power_value = 1.0;
+        double take_power_value = 0.3;
+
         auto calc_add_power = [&](int k, int r) {
-            double add = 1;
+            double add = add_power_value;
             {
                 double sum = 0;
                 for (int n: nms) {
@@ -1290,7 +1293,6 @@ struct Solution {
             return add;
         };
 
-        constexpr double take_power = 0.3;
         auto RobinHood = [&](int n, int k, int r) { // NOLINT
             // посмотрим у кого мы можем отобрать силу, чтобы взять ее себе
 
@@ -1300,7 +1302,7 @@ struct Solution {
             vector<tuple<double, int>> kek;
             for (int m: nms) {
                 if (n != m) {
-                    if (p[t][m][k][r] > take_power) {
+                    if (p[t][m][k][r] > take_power_value) {
                         int j = n_to_j[m];
                         // kek.emplace_back((total_g[j] + add_g[t][m]) - requests[j].TBS, m); // 16067.854 points
                         // TODO: рассматривать add_g[t][n] / sum_power
@@ -1339,9 +1341,9 @@ struct Solution {
 
             for (auto [weight, m]: kek) {
                 ASSERT(verify_power(t), "failed power");
-                update_dynamics(m, k, r, -take_power);
+                update_dynamics(m, k, r, -take_power_value);
                 ASSERT(verify_power(t), "failed power");
-                update_dynamics(n, k, r, +take_power);
+                update_dynamics(n, k, r, +take_power_value);
                 ASSERT(verify_power(t), "failed power");
 
                 double new_f = fast_f();
@@ -1351,15 +1353,16 @@ struct Solution {
                     best_m = m;
                 }
 
-                update_dynamics(n, k, r, -take_power);
+                update_dynamics(n, k, r, -take_power_value);
                 ASSERT(verify_power(t), "failed power");
-                update_dynamics(m, k, r, +take_power);
+                update_dynamics(m, k, r, +take_power_value);
                 ASSERT(verify_power(t), "failed power");
-                fast_f();
-                break;
+                // fast_f();
+                //break;
             }
+            fast_f();
 
-            return tuple{best_f, take_power, best_m};
+            return tuple{best_f, take_power_value, best_m};
         };
 
         double best_f = fast_f();
@@ -1475,7 +1478,44 @@ struct Solution {
             }
 
             if (!do_step(j)) {
-                break;
+                if(add_power_value < 0.1){
+                    break;
+                }
+                else{
+                    add_power_value *= 0.9;
+                    take_power_value *= 0.9;
+                }
+                /*vector<tuple<double, int>> kek;
+                for (int j: js) {
+                    auto [TBS, n, t0, t1, ost_len] = requests[j];
+                    if (total_g[j] + add_g[t][n] < TBS) {
+                        // невыполненный запрос
+                        // вроде найс: -add_g[t][n] + TBS
+                        kek.emplace_back(-add_g[t][n] + TBS -sum_power(t, n), j);
+                    }
+                }
+                sort(kek.begin(), kek.end());
+                const int KEK_SZ = 10;//(int)kek.size() / 2;
+                while((int)kek.size() > KEK_SZ){
+                    kek.pop_back();
+                }
+                for (auto [weight, j]: kek) {
+                    auto [TBS, n, t0, t1, ost_len] = requests[j];
+                    for (int k = 0; k < K; k++) {
+                        for (int r = 0; r < R; r++) {
+                            p[t][n][k][r] = 0;
+                        }
+                    }
+                }
+
+                dp_count = correct_build_dp_count();
+                dp_prod = correct_build_dp_prod();
+                dp_accum_prod = correct_build_dp_accum_prod();
+                dp_exp_d_prod = correct_build_dp_exp_d_prod();
+                dp_denom_sum = correct_build_dp_denom_sum();
+                dp_denom_sum_global_add.assign(N, vector<double>(R));
+                best_f = fast_f();
+            }*/
             }
         }
 
