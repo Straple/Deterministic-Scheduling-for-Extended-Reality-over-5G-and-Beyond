@@ -955,6 +955,8 @@ struct Solution {
 
         constexpr double add_power_value = 1.0;
 
+        constexpr double remove_power_value = 0.3;
+
         auto calc_add_power = [&](int k, int r) {
             double add = add_power_value;
             {
@@ -982,6 +984,25 @@ struct Solution {
             return add;
         };
 
+        double absolute_best_f = -1e300;
+        vector<vector<vector<double>>> absolute_best_power(N, vector(K, vector<double>(R)));
+
+        auto update_absolute_best = [&]() {
+            double f = fast_f();
+            if (f > absolute_best_f) {
+                absolute_best_f = f;
+                for (int n = 0; n < N; n++) {
+                    for (int k = 0; k < K; k++) {
+                        for (int r = 0; r < R; r++) {
+                            absolute_best_power[n][k][r] = p[t][n][k][r];
+                        }
+                    }
+                }
+            }
+        };
+
+        update_absolute_best();
+
         auto do_step_add = [&]() {
             double best_f = -1e300;
             int best_j = -1;
@@ -993,7 +1014,7 @@ struct Solution {
                 for (int k = 0; k < K; k++) {
                     for (int r = 0; r < R; r++) {
                         double add = calc_add_power(k, r);
-                        if (add != 0) {
+                        if (add != 0 && add == add_power_value) {
                             update_dynamics(n, k, r, +add);
                             double new_f = fast_f();
                             update_dynamics(n, k, r, -add);
@@ -1015,12 +1036,74 @@ struct Solution {
             }
             int n = requests[best_j].n;
             update_dynamics(n, best_k, best_r, best_add);
+            update_absolute_best();
             return true;
         };
 
+        auto do_step_remove = [&]() {
+            double best_f = -1e300;
+            int best_j = -1;
+            int best_k = -1;
+            int best_r = -1;
+            double best_add = 0;
+            for (int j: js) {
+                int n = requests[j].n;
+                for (int k = 0; k < K; k++) {
+                    for (int r = 0; r < R; r++) {
+                        if (p[t][n][k][r] > 0) {
+                            double x = min(p[t][n][k][r], remove_power_value);
+                            update_dynamics(n, k, r, -x);
+                            double new_f = fast_f();
+                            update_dynamics(n, k, r, +x);
+
+                            if (best_f < new_f) {
+                                best_f = new_f;
+                                best_j = j;
+                                best_k = k;
+                                best_r = r;
+                                best_add = -x;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (best_j == -1) {
+                return false;
+            }
+            int n = requests[best_j].n;
+            update_dynamics(n, best_k, best_r, best_add);
+            update_absolute_best();
+            return true;
+        };
+
+        int kek = 2;
         while (true) {
-            if (!do_step_add()) {
-                break;
+            //cout << fast_f() << "->";
+            bool run = false;
+            run |= do_step_add();
+            run |= do_step_add();
+            do_step_remove();
+            do_step_remove();
+            if (!run) {
+                kek--;
+                if(kek < 0){
+                    break;
+                }
+                do_step_remove();
+                do_step_remove();
+                do_step_remove();
+                do_step_remove();
+            }
+        }
+        //cout << endl << endl;
+
+        // accept best power
+        for (int n = 0; n < N; n++) {
+            for (int k = 0; k < K; k++) {
+                for (int r = 0; r < R; r++) {
+                    p[t][n][k][r] = absolute_best_power[n][k][r];
+                }
             }
         }
     }
@@ -1267,29 +1350,29 @@ int main() {
         }
         cout << "TEST CASE==============\n";
 #endif
-        //std::ios::sync_with_stdio(false);
-        //std::cin.tie(0);
-        //std::cout.tie(0);
+    //std::ios::sync_with_stdio(false);
+    //std::cin.tie(0);
+    //std::cout.tie(0);
 
-        Solution solution;
+    Solution solution;
 #ifdef FAST_STREAM
-        solution.read();
+    solution.read();
 #else
-        solution.read(input);
-        auto time_start = steady_clock::now();
+    solution.read(input);
+    auto time_start = steady_clock::now();
 #endif
 
-        solution.solve();
+    solution.solve();
 
 #ifndef FAST_STREAM
-        auto time_stop = steady_clock::now();
-        auto duration = time_stop - time_start;
-        double time = duration_cast<nanoseconds>(duration).count() / 1e9;
-        cout << solution.get_score() << '/' << solution.J << ' ' << time << "s" << endl;
+    auto time_stop = steady_clock::now();
+    auto duration = time_stop - time_start;
+    double time = duration_cast<nanoseconds>(duration).count() / 1e9;
+    cout << solution.get_score() << '/' << solution.J << ' ' << time << "s" << endl;
 #endif
 
 #ifdef FAST_STREAM
-        solution.print();
+    solution.print();
 #endif
 
 #ifndef FAST_STREAM
