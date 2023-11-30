@@ -1219,10 +1219,9 @@ struct Solution {
                 if (add_g[t][n] + total_g[j] >= TBS) {
                     x += 1e6;
                 } else {
-                    x += add_g[t][n] - TBS;
+                    x += add_g[t][n] - TBS * 1.1;
                 }
                 ASSERT(ost_len != 0, "ost_len is zero, why?");
-                x *= 1.0 / ost_len;
                 result += x;
             }
             return result;
@@ -1256,13 +1255,14 @@ struct Solution {
                 //TEST CASE==============
                 //184/184 0.0688514s
 
+                // TODO: улучшить эту метрику
                 if (add_g[t][n] + total_g[j] >= TBS) {
                     x += 1e6;
                 } else {
                     x += add_g[t][n] - TBS * 1.1;
                 }
+
                 ASSERT(ost_len != 0, "ost_len is zero, why?");
-                x *= 1.0 / ost_len;
                 result += x;
             }
 
@@ -1278,7 +1278,7 @@ struct Solution {
             return result;
         };
 
-        double add_power_value = 1.0;
+        double add_power_value = 1;
         double take_power_value = 0.3;
 
         auto calc_add_power = [&](int k, int r) {
@@ -1322,16 +1322,6 @@ struct Solution {
                         // kek.emplace_back((total_g[j] + add_g[t][m]) - requests[j].TBS, m); // 16067.854 points
                         // TODO: рассматривать add_g[t][n] / sum_power
                         // типа то, сколько мы получаем g за единицу вложенной силы
-
-                        /*double sum_power = 0;
-                        for(int k = 0; k < K; k++){
-                            for(int r =0; r < R; r++){
-                                sum_power += p[t][m][k][r];
-                            }
-                        }
-                        if(sum_power == 0){
-                            sum_power = 1;
-                        }*/
 
                         //kek.emplace_back(0.5 * (total_g[j] + add_g[t][m]) / requests[j].TBS +
                         //                 add_g[t][m] / sum_power, m);
@@ -1380,7 +1370,7 @@ struct Solution {
             return tuple{best_f, take_power_value, best_m};
         };
 
-        double best_f = fast_f();
+        double DIVINE_f = fast_f();
 #ifdef VERIFY_DP
         ASSERT(high_equal(fast_f(), correct_f()), "fatal");
 #endif
@@ -1393,7 +1383,7 @@ struct Solution {
 
             auto [TBS, n, t0, t1, ost_len] = requests[j];
 
-            double best_f = fast_f();
+            double best_f = -1e300;
             int best_m = -1;
             int best_k = -1;
             int best_r = -1;
@@ -1416,6 +1406,25 @@ struct Solution {
                                 best_k = k;
                                 best_r = r;
                             }
+                        }
+                    }
+
+                    // try to sub
+                    {
+                        double sub = max(0.1, p[t][n][k][r] / 2);
+                        if (sub < p[t][n][k][r]) {
+                            update_dynamics(n, k, r, -sub);
+                            double new_f = fast_f();
+                            update_dynamics(n, k, r, +sub);
+
+                            if (best_f < new_f) {
+                                best_add = -sub;
+                                best_m = -1;
+                                best_f = new_f;
+                                best_k = k;
+                                best_r = r;
+                            }
+
                         }
                     }
 
@@ -1456,6 +1465,7 @@ struct Solution {
             return tuple{best_f, j, best_m, best_k, best_r, best_add};
         };
 
+        int loller = 0;
         for (int step = 0; step < STEPS && !js.empty(); step++) {
             //cout << fast_f() << "->";
 
@@ -1511,6 +1521,7 @@ struct Solution {
                 return foo(lhs) < foo(rhs);
             });
 
+            double best_f = -1e200;
             int best_j = -1;
             int best_m = -1;
             int best_k = -1;
@@ -1541,7 +1552,16 @@ struct Solution {
                 }
             }
 
-            reverse(js.begin(), js.end());
+            //TEST CASE==============
+            //2/2 0.00018763s
+            //TEST CASE==============
+            //143.994/150 0.120328s
+            //TEST CASE==============
+            //685.999/829 0.133603s
+            //TEST CASE==============
+            //184/184 0.050675s
+
+            /*reverse(js.begin(), js.end());
 
             count_visited = 0;
             for (int j: js) {
@@ -1553,11 +1573,20 @@ struct Solution {
                         break;
                     }
                 }
-            }
+            }*/
 
             if (best_j == -1) {
                 break;
             }
+
+            if (best_f <= DIVINE_f) {
+                loller++;
+                if (loller == 5) {
+                    break;
+                }
+                // сделаем какой-то шаг
+            }
+            DIVINE_f = best_f;
 
             auto [TBS, n, t0, t1, ost_len] = requests[best_j];
 
@@ -1572,53 +1601,10 @@ struct Solution {
                 ASSERT(verify_power(t), "failed power");
             }
             fast_f();
+
+            //cout << abs(fast_f() - DIVINE_f) << endl;
+            ASSERT(high_equal(fast_f(), DIVINE_f), "failed");
         }
-
-        //cout << endl << endl;
-        /*
-         {
-            for (int j: js) {
-                minimize_power(t, j);
-            }
-            // мы освободили силу без ущерба ответу
-            // стало только лучше
-            // теперь давайте эту свободную силу заиспользуем: дадим ее другим
-            set<int> tried;
-            while (true) {
-                // найдем запрос с самым минимальным добавлением силы, чтобы удовлетворить его
-                int best_j = -1;
-                double best_f = 1e300;
-                for (int j: js) {
-                    auto [TBS, n, t0, t1, ost_len] = requests[j];
-                    if (!tried.contains(j) && sum_power(t, n) != 0 && total_g[j] + get_g(t, n) < TBS) {
-                        // мы не пытались улучшить этот запрос и он используется, но не отправлен
-                        double cur_f = TBS - (total_g[j] + get_g(t, n));
-                        //(calc_power_factor_for_accept_request(t, j) - 1) * sum_power(t, n);
-                        if (best_j == -1 || best_f > cur_f) {
-                            best_f = cur_f;
-                            best_j = j;
-                        }
-                    }
-                }
-
-                if (best_j == -1) {
-                    break;
-                }
-
-                int j = best_j;
-                auto [TBS, n, t0, t1, ost_len] = requests[j];
-                tried.insert(j);
-
-                double factor = calc_power_factor_for_accept_request(t, j);
-
-                if (factor != 0) {
-                    mult_power(t, n, factor);
-                }
-            }
-        }*/
-
-        // update total_g[j]
-        //fast_f(); /// for update add_g[t][n]!!!
     }
 
     void set_nice_power(int t, vector<int> js) {
