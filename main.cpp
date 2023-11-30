@@ -302,7 +302,7 @@ bool high_equal(double x, double y) {
     if (is_spoiled(x) || is_spoiled(y)) {
         exit(1);
     }
-    return abs(x - y) <= 1e-9 * max(abs(x), abs(y));
+    return abs(x - y) <= 1e-9 * max({1.0, abs(x), abs(y)});
 }
 
 #define FAST_STREAM
@@ -319,8 +319,8 @@ bool high_equal(double x, double y) {
 
 #define FAILED_ASSERT(message)                                                \
     {                                                                         \
-        std::cerr << "assert failed at " __FILE__ << ":" << __LINE__ << '\n'; \
-        std::cerr << "message: \"" << (message) << "\"\n";                    \
+        std::cout << "assert failed at " __FILE__ << ":" << __LINE__ << '\n'; \
+        std::cout << "message: \"" << (message) << "\"" << endl;                    \
         std::exit(1);                                                         \
     }
 
@@ -350,11 +350,6 @@ struct Solution {
     int T;
     int R;
     int J;
-
-    enum build_weights_version {
-        ALL,
-        ONCE_IN_R,
-    } use_build_weight_version = ONCE_IN_R;
 
     // s0[t][n][k][r]
     vector<vector<vector<vector<double>>>> s0;
@@ -560,86 +555,6 @@ struct Solution {
         }
     }
 
-    void mult_power(int t, int n, double factor) {
-        for (int k = 0; k < K; k++) {
-            for (int r = 0; r < R; r++) {
-                p[t][n][k][r] *= factor;
-            }
-        }
-    }
-
-    double calc_g_with_power_factor(int t, int n, double factor) {
-        auto old_power = power_snapshot(t, n);
-        mult_power(t, n, factor);
-        double g = get_g(t, n);
-        set_power(t, n, old_power);
-        return g;
-    }
-
-    bool verify_mult_power(int t, int n, double factor) {
-        vector<double> sum(K);
-        for (int m = 0; m < N; m++) {
-            for (int k = 0; k < K; k++) {
-                for (int r = 0; r < R; r++) {
-                    if (m != n) {
-                        sum[k] += p[t][m][k][r];
-                    } else {
-                        sum[k] += factor * p[t][m][k][r];
-                    }
-                }
-            }
-        }
-        for (int k = 0; k < K; k++) {
-            if (sum[k] > R) {
-                return false;
-            }
-        }
-        for (int k = 0; k < K; k++) {
-            for (int r = 0; r < R; r++) {
-                double sum = 0;
-                for (int m = 0; m < N; m++) {
-                    if (m != n) {
-                        sum += p[t][m][k][r];
-                    } else {
-                        sum += factor * p[t][m][k][r];
-                    }
-                }
-                if (sum > 4) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-
-    // если этот запрос отправлен, то эта функция минимизирует количество затраченной силы для этого,
-    // чтобы дать возможность другим запросам пользоваться большей силой
-    /// !вызывать до обновления total_g[j]!
-    void minimize_power(int t, int j) {
-        auto [TBS, n, t0, t1, ost_len] = requests[j];
-        double add_g = get_g(t, n);
-        if (add_g + total_g[j] >= TBS + 1e-1) {
-#ifdef PRINT_DEBUG_INFO
-            cout << "minimize_power(" << TBS << ") " << add_g + total_g[j] << "->";
-#endif
-
-            double tl = 0, tr = 1;
-            while (tl < tr - 1e-3) {
-                double tm = (tl + tr) / 2;
-                if (calc_g_with_power_factor(t, n, tm) + total_g[j] >= TBS) {
-                    tr = tm;
-                } else {
-                    tl = tm;
-                }
-            }
-            double good_factor = tr;
-            mult_power(t, n, tr);
-#ifdef PRINT_DEBUG_INFO
-            cout << total_g[j] + get_g(t, n) << endl;
-#endif
-        }
-    }
-
     double sum_power(int t, int n) {
         double sum = 0;
         for (int k = 0; k < K; k++) {
@@ -648,234 +563,6 @@ struct Solution {
             }
         }
         return sum;
-    }
-
-    // если сообщение не отправлено
-    // то вернет множитель силы, на который нужно домножить
-    // чтобы отправить это сообщение
-    // либо 0
-    double calc_power_factor_for_accept_request(int t, int j) {
-        auto [TBS, n, t0, t1, ost_len] = requests[j];
-
-        // этот запрос не используется
-        if (sum_power(t, n) == 0) {
-            return 0;
-        }
-
-#ifdef PRINT_DEBUG_INFO
-        cout << "more_power(" << TBS << ") " << get_g(t, n) + total_g[j] << "->";
-#endif
-
-        double tl = 0, tr = 1e9;
-        while (tl < tr - 1e-3) {
-            double tm = (tl + tr) / 2;
-            // TODO: это сделает неточным good_factor=tr
-            /*if (!verify_mult_power(t, n, tm)) {
-                // мы домножили на слишком большое число
-                tr = tm;
-            }*/
-            if (calc_g_with_power_factor(t, n, tm) + total_g[j] >= TBS) {
-                tr = tm;
-            } else {
-                tl = tm;
-            }
-        }
-
-        double good_factor = tr;
-        ASSERT(good_factor > 1, "why not?");
-#ifdef PRINT_DEBUG_INFO
-        cout << calc_g_with_power_factor(t, n, good_factor) + total_g[j] << ", good_factor: " << good_factor
-             << ", verify: " << verify_mult_power(t, n, good_factor) << endl;
-#endif
-        if (verify_mult_power(t, n, good_factor)) {
-            return good_factor;
-        } else {
-            return 0;
-        }
-    }
-
-    void set_power(int t, vector<tuple<double, int, int, int>> set_of_weights) {
-        if (use_build_weight_version == ONCE_IN_R) {
-            for (auto [weight, n, k, r]: set_of_weights) {
-                p[t][n][k][r] = min(4.0, weight * R);
-            }
-        } else {
-            for (auto [weight, n, k, r]: set_of_weights) {
-                p[t][n][k][r] = 4 * weight;
-            }
-            vector<double> sum(K);
-            for (auto [weight, n, k, r]: set_of_weights) {
-                sum[k] += p[t][n][k][r];
-            }
-            for (auto [weight, n, k, r]: set_of_weights) {
-                if (sum[k] > 1e-9) {
-                    p[t][n][k][r] *= min(1.0, R / sum[k]);
-                }
-            }
-        }
-    }
-
-    vector<tuple<double, int, int, int>> build_weights_of_power(int t, const vector<int> &js) {
-        // (weight, n, k, r)
-        vector<tuple<double, int, int, int>> set_of_weights;
-        if (use_build_weight_version == ONCE_IN_R) {
-            // requests_weights[r] = {}
-            vector<vector<tuple<double, int>>> requests_weights(R);
-            for (int j: js) {
-                auto [TBS, n, t0, t1, ost_len] = requests[j];
-                for (int r = 0; r < R; r++) {
-                    double weight = 1;
-                    ASSERT(total_g[j] < TBS, "failed");
-
-                    weight *= exp(-cbrt(TBS - total_g[j]));
-                    for (int k = 0; k < K; k++) {
-                        weight *= s0[t][n][k][r];
-                    }
-
-                    ASSERT(weight >= 0 && !is_spoiled(weight), "invalid weight");
-
-                    requests_weights[r].emplace_back(weight, j);
-                }
-            }
-
-            // (weight, r, j)
-            set<tuple<double, int, int>, greater<>> S;
-            for (int r = 0; r < R; r++) {
-                for (auto [weight, j]: requests_weights[r]) {
-                    S.insert({weight, r, j});
-                }
-            }
-            vector<bool> used(R, false);
-            while (!S.empty()) {
-                //cout << S.size() << endl;
-                auto [weight, r, j] = *S.begin();
-                S.erase(S.begin());
-                if (used[r]) {
-                    continue;
-                }
-                used[r] = true;
-
-                // relax others
-                {
-                    set<tuple<double, int, int>, greater<>> new_S;
-                    for (auto [weight2, r2, j2]: S) {
-                        if (j == j2) {
-                            new_S.insert({weight2 / 1e40, r2, j2});
-                        } else {
-                            new_S.insert({weight2, r2, j2});
-                        }
-                    }
-                    S = new_S;
-                }
-
-                auto [TBS, n, t0, t1, ost_len] = requests[j];
-
-                for (int k = 0; k < K; k++) {
-                    double weight = 1;
-
-                    ASSERT(total_g[j] < TBS, "failed");
-
-                    //weight = 30 - log(1 + TBS);//+ log(1 + total_g[j]);
-
-                    //cout << weight << endl;
-                    ASSERT(weight >= 0 && !is_spoiled(weight), "invalid weight");
-
-                    set_of_weights.emplace_back(weight, n, k, r);
-                }
-            }
-        } else if (use_build_weight_version == ALL) {
-            for (int j: js) {
-                auto [TBS, n, t0, t1, ost_len] = requests[j];
-
-                for (int k = 0; k < K; k++) {
-                    for (int r = 0; r < R; r++) {
-                        double weight = 1;
-                        for (int j2: js) {
-                            int m = requests[j2].n;
-                            if (n != m) {
-                                weight *= pow(exp_d[n][m][k][r], 3);
-                            }
-                        }
-
-                        ASSERT(weight >= 0 && !is_spoiled(weight), "invalid weight");
-
-                        set_of_weights.emplace_back(weight, n, k, r);
-                    }
-                }
-            }
-        } else {
-            ASSERT(false, "invalid build weights version");
-        }
-
-        auto calc_sum = [&]() {
-            vector<double> sum_weight(K);
-            for (auto [weight, n, k, r]: set_of_weights) {
-                ASSERT(weight >= 0, "invalid weight");
-                sum_weight[k] += weight;
-            }
-            return sum_weight;
-        };
-
-        auto calc_sum2 = [&]() {
-            vector<vector<double>> sum_weight(K, vector<double>(R));
-            for (auto [weight, n, k, r]: set_of_weights) {
-                ASSERT(weight >= 0, "invalid weight");
-                sum_weight[k][r] += weight;
-            }
-            return sum_weight;
-        };
-
-        auto fix_sum = [&]() {
-            if (use_build_weight_version == ONCE_IN_R) {
-                auto sum_weight = calc_sum();
-
-                for (auto &[weight, n, k, r]: set_of_weights) {
-                    if (sum_weight[k] != 0) {
-                        weight = weight / sum_weight[k];
-                    } else {
-                        weight = 0;
-                    }
-                }
-            } else {
-                auto sum_weight = calc_sum2();
-
-                for (auto &[weight, n, k, r]: set_of_weights) {
-                    if (sum_weight[k][r] != 0) {
-                        weight = weight / sum_weight[k][r];
-                    } else {
-                        weight = 0;
-                    }
-                }
-            }
-        };
-
-        auto threshold = [&]() {
-            for (int i = 0; i < set_of_weights.size(); i++) {
-                auto [weight, n, k, r] = set_of_weights[i];
-                if (weight < 0.02) {
-                    swap(set_of_weights[i], set_of_weights.back());
-                    set_of_weights.pop_back();
-                    i--;
-                }
-            }
-        };
-
-        auto verify = [&]() {
-            for (auto [weight, n, k, r]: set_of_weights) {
-                ASSERT(0 <= weight && weight <= 1, "invalid weight");
-            }
-            auto sum_weight = calc_sum();
-            for (int k = 0; k < K; k++) {
-                ASSERT(sum_weight[k] == 0 || abs(sum_weight[k] - 1) < 1e-9, "invalid sum_weight");
-
-            }
-        };
-
-        fix_sum();
-        threshold();
-        fix_sum();
-
-        return set_of_weights;
     }
 
     void deterministic_descent(int t, vector<int> js) {
@@ -1039,6 +726,15 @@ struct Solution {
                 return;
             }
 
+#ifdef DEBUG_MODE
+            if(high_equal(change, 0)){
+                cout << fixed << setprecision(50);
+                cout << "lol:\n" << change << endl;
+            }
+#endif
+
+            double old_p = p[t][n][k][r];
+
             for (int m: nms) {
                 for (int k = 0; k < K; k++) {
                     if (p[t][m][k][r] > 0) {
@@ -1048,8 +744,16 @@ struct Solution {
                 }
             }
 
+            ASSERT(!(p[t][n][k][r] != 0 && high_equal(p[t][n][k][r], 0)), ":_(");
+
             // ====================
             p[t][n][k][r] += change;
+            if (high_equal(p[t][n][k][r], 0)) {
+                p[t][n][k][r] = 0;
+            }
+            double new_p = p[t][n][k][r];
+
+            ASSERT(!(p[t][n][k][r] != 0 && high_equal(p[t][n][k][r], 0)), ":_(");
             // ====================
 
             for (int m: nms) {
@@ -1135,11 +839,14 @@ struct Solution {
                     for (int r = 0; r < R; r++) {
                         ASSERT(!is_spoiled(dp_exp_d_prod[n][k][r]), "fatal");
                         if (!high_equal(dp_exp_d_prod[n][k][r], correct_dp_exp_d_prod[n][k][r])) {
-                            //cout << fixed << setprecision(50);
+                            cout << fixed << setprecision(50);
                             cout << "\n\nerror:\n" << abs(dp_exp_d_prod[n][k][r] - correct_dp_exp_d_prod[n][k][r])
                                  << '\n'
                                  << dp_exp_d_prod[n][k][r] << '\n'
                                  << correct_dp_exp_d_prod[n][k][r] << endl;
+
+                            cout << "change:\n" << change << '\n' << new_p << '\n' << old_p << '\n';
+
                             ASSERT(false, "failed");
                         }
                     }
@@ -1278,8 +985,17 @@ struct Solution {
             return result;
         };
 
-        double add_power_value = 1;
-        double take_power_value = 0.3;
+        //TEST CASE==============
+        //2/2 4.9136e-05s
+        //TEST CASE==============
+        //145.993/150 0.899706s
+        //TEST CASE==============
+        //685.999/829 0.245169s
+        //TEST CASE==============
+        //184/184 0.0307541s
+
+        double add_power_value = 4.0 / js.size();
+        double take_power_value = 4.0 / js.size() * 0.3;
 
         auto calc_add_power = [&](int k, int r) {
             double add = add_power_value;
@@ -1302,7 +1018,7 @@ struct Solution {
                 add = min(add, R - sum);
                 ASSERT(sum <= R + 1e-9, "fatal");
             }
-            if (add < 1e-9) {
+            if (add < 1e-8) {
                 add = 0;
             }
             return add;
@@ -1313,11 +1029,21 @@ struct Solution {
 
             double best_f = -1e300;
             int best_m = -1;
+            int best_r = -1;
 
-            vector<tuple<double, int>> kek;
-            for (int m: nms) {
-                if (n != m) {
-                    if (p[t][m][k][r] > take_power_value) {
+            for (int r2 = 0; r2 < R; r2++) {
+
+                vector<tuple<double, int>> kek;
+                for (int m: nms) {
+                    if (p[t][m][k][r2] > take_power_value) {
+                        double sum = 0;
+                        for (int n: nms) {
+                            sum += p[t][n][k][r];
+                        }
+                        if (sum + take_power_value > 4.0) {
+                            continue;
+                        }
+
                         int j = n_to_j[m];
                         // kek.emplace_back((total_g[j] + add_g[t][m]) - requests[j].TBS, m); // 16067.854 points
                         // TODO: рассматривать add_g[t][n] / sum_power
@@ -1341,33 +1067,58 @@ struct Solution {
                         kek.emplace_back(add_g[t][m] - requests[j].TBS, m);
                     }
                 }
-            }
-            sort(kek.begin(), kek.end(), greater<>());
+                sort(kek.begin(), kek.end(), greater<>());
 
-            for (auto [weight, m]: kek) {
-                ASSERT(verify_power(t), "failed power");
-                update_dynamics(m, k, r, -take_power_value);
-                ASSERT(verify_power(t), "failed power");
-                update_dynamics(n, k, r, +take_power_value);
-                ASSERT(verify_power(t), "failed power");
+                for (auto [weight, m]: kek) {
+                    ASSERT(verify_power(t), "failed power");
+                    update_dynamics(m, k, r2, -take_power_value);
+                    update_dynamics(n, k, r, +take_power_value);
+                    ASSERT(verify_power(t), "failed power");
+                    double new_f = fast_f();
 
-                double new_f = fast_f();
+                    if (new_f > best_f) {
+                        best_f = new_f;
+                        best_m = m;
+                        best_r = r2;
+                    }
 
-                if (new_f > best_f) {
-                    best_f = new_f;
-                    best_m = m;
+                    ASSERT(verify_power(t), "failed power");
+                    update_dynamics(n, k, r, -take_power_value);
+                    update_dynamics(m, k, r2, +take_power_value);
+                    ASSERT(verify_power(t), "failed power");
+                    //break;
                 }
+                /*for (int m: nms) {
+                    if (p[t][m][k][r2] >= take_power_value) {
+                        double sum = 0;
+                        for (int n: nms) {
+                            sum += p[t][n][k][r];
+                        }
+                        if (sum + take_power_value > 4.0) {
+                            continue;
+                        }
+                        ASSERT(verify_power(t), "failed power");
+                        update_dynamics(m, k, r2, -take_power_value);
+                        update_dynamics(n, k, r, +take_power_value);
+                        ASSERT(verify_power(t), "failed power");
+                        double new_f = fast_f();
 
-                update_dynamics(n, k, r, -take_power_value);
-                ASSERT(verify_power(t), "failed power");
-                update_dynamics(m, k, r, +take_power_value);
-                ASSERT(verify_power(t), "failed power");
-                // fast_f();
-                break;
+                        if (new_f > best_f) {
+                            best_f = new_f;
+                            best_m = m;
+                            best_r = r2;
+                        }
+
+                        ASSERT(verify_power(t), "failed power");
+                        update_dynamics(n, k, r, -take_power_value);
+                        update_dynamics(m, k, r2, +take_power_value);
+                        ASSERT(verify_power(t), "failed power");
+                    }
+                }*/
             }
             fast_f();
 
-            return tuple{best_f, take_power_value, best_m};
+            return tuple{best_f, take_power_value, best_m, best_r};
         };
 
         double DIVINE_f = fast_f();
@@ -1387,6 +1138,7 @@ struct Solution {
             int best_m = -1;
             int best_k = -1;
             int best_r = -1;
+            int best_r2 = -1;
             double best_add = 0;
             for (int k = 0; k < K; k++) {
                 for (int r = 0; r < R; r++) {
@@ -1430,7 +1182,7 @@ struct Solution {
 
                     // try to take away
                     {
-                        auto [new_f, take_power, m] = RobinHood(n, k, r);
+                        auto [new_f, take_power, m, r2] = RobinHood(n, k, r);
                         if (m != -1) {
                             if (best_f < new_f) {
                                 best_add = take_power;
@@ -1438,6 +1190,7 @@ struct Solution {
                                 best_f = new_f;
                                 best_k = k;
                                 best_r = r;
+                                best_r2 = r2;
                             }
                         }
                     }
@@ -1462,21 +1215,12 @@ struct Solution {
                 }
             }
 
-            return tuple{best_f, j, best_m, best_k, best_r, best_add};
+            return tuple{best_f, j, best_m, best_k, best_r, best_r2, best_add};
         };
 
         int loller = 0;
         for (int step = 0; step < STEPS && !js.empty(); step++) {
             //cout << fast_f() << "->";
-
-            //TEST CASE==============
-            //2/2 4.3538e-05s
-            //TEST CASE==============
-            //145.993/150 0.263592s
-            //TEST CASE==============
-            //680.999/829 0.314781s
-            //TEST CASE==============
-            //184/184 0.0654606s
 
             auto foo = [&](int j) {
                 auto [TBS, n, t0, t1, ost_len] = requests[j];
@@ -1526,16 +1270,18 @@ struct Solution {
             int best_m = -1;
             int best_k = -1;
             int best_r = -1;
+            int best_r2 = -1;
             double best_add = 0;
 
-            auto update_best = [&](tuple<double, int, int, int, int, double> step) {
-                auto [f, j, m, k, r, add] = step;
-                if (f > best_f + 1e-9) {
+            auto update_best = [&](tuple<double, int, int, int, int, int, double> step) {
+                auto [f, j, m, k, r, r2, add] = step;
+                if (f > best_f) {
                     best_f = f;
                     best_j = j;
                     best_m = m;
                     best_k = k;
                     best_r = r;
+                    best_r2 = r2;
                     best_add = add;
                 }
             };
@@ -1551,15 +1297,6 @@ struct Solution {
                     }
                 }
             }
-
-            //TEST CASE==============
-            //2/2 0.00018763s
-            //TEST CASE==============
-            //143.994/150 0.120328s
-            //TEST CASE==============
-            //685.999/829 0.133603s
-            //TEST CASE==============
-            //184/184 0.050675s
 
             /*reverse(js.begin(), js.end());
 
@@ -1579,20 +1316,21 @@ struct Solution {
                 break;
             }
 
-            if (best_f <= DIVINE_f) {
+            if (best_f <= DIVINE_f + 1e-7) {
                 loller++;
-                if (loller == 5) {
+                if (loller > 0) {
                     break;
                 }
                 // сделаем какой-то шаг
             }
+            //cout << best_f - DIVINE_f << '\n';
             DIVINE_f = best_f;
 
             auto [TBS, n, t0, t1, ost_len] = requests[best_j];
 
             if (best_m != -1) {
                 // Robin Hood
-                update_dynamics(best_m, best_k, best_r, -best_add);
+                update_dynamics(best_m, best_k, best_r2, -best_add);
                 update_dynamics(n, best_k, best_r, +best_add);
                 ASSERT(verify_power(t), "failed power");
             } else if (best_k != -1) {
@@ -1605,6 +1343,7 @@ struct Solution {
             //cout << abs(fast_f() - DIVINE_f) << endl;
             ASSERT(high_equal(fast_f(), DIVINE_f), "failed");
         }
+        //cout << endl << endl;
     }
 
     void set_nice_power(int t, vector<int> js) {
@@ -1639,27 +1378,6 @@ struct Solution {
         }
 
         deterministic_descent(t, js);
-
-        /*set_power(t, build_weights_of_power(t, js));
-        deterministic_descent(t, js);
-        double scoreA = get_score_in_time();
-        auto powerA = power_snapshot(t);
-
-        for (int n = 0; n < N; n++) {
-            for (int k = 0; k < K; k++) {
-                for (int r = 0; r < R; r++) {
-                    p[t][n][k][r] = 0;
-                }
-            }
-        }
-
-        deterministic_descent(t, js);
-        double scoreB = get_score_in_time();
-        //auto powerB = power_snapshot(t);
-
-        if(scoreA > scoreB){
-            set_power(t, powerA);
-        }*/
 
         for (int j: js) {
             int n = requests[j].n;
@@ -1890,29 +1608,29 @@ int main() {
         }
         cout << "TEST CASE==============\n";
 #endif
-    //std::ios::sync_with_stdio(false);
-    //std::cin.tie(0);
-    //std::cout.tie(0);
+        //std::ios::sync_with_stdio(false);
+        //std::cin.tie(0);
+        //std::cout.tie(0);
 
-    Solution solution;
+        Solution solution;
 #ifdef FAST_STREAM
-    solution.read();
+        solution.read();
 #else
-    solution.read(input);
-    auto time_start = steady_clock::now();
+        solution.read(input);
+        auto time_start = steady_clock::now();
 #endif
 
-    solution.solve();
+        solution.solve();
 
 #ifndef FAST_STREAM
-    auto time_stop = steady_clock::now();
-    auto duration = time_stop - time_start;
-    double time = duration_cast<nanoseconds>(duration).count() / 1e9;
-    cout << solution.get_score() << '/' << solution.J << ' ' << time << "s" << endl;
+        auto time_stop = steady_clock::now();
+        auto duration = time_stop - time_start;
+        double time = duration_cast<nanoseconds>(duration).count() / 1e9;
+        cout << solution.get_score() << '/' << solution.J << ' ' << time << "s" << endl;
 #endif
 
 #ifdef FAST_STREAM
-    solution.print();
+        solution.print();
 #endif
 
 #ifndef FAST_STREAM
