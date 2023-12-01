@@ -305,7 +305,7 @@ bool high_equal(double x, double y) {
     return abs(x - y) <= 1e-9 * max({1.0, abs(x), abs(y)});
 }
 
-#define FAST_STREAM
+//#define FAST_STREAM
 
 //#define PRINT_DEBUG_INFO
 
@@ -988,15 +988,6 @@ struct Solution {
         };
 
         double deltas = 1.0;// / js.size();
-        /*for (int j: js) {
-            int n = requests[j].n;
-            for (int k = 0; k < K; k++) {
-                for (int r = 0; r < R; r++) {
-                    update_dynamics(n, k, r, deltas);
-                }
-            }
-        }
-        ASSERT(verify_power(t), "failed build power");*/
 
         // было
         //TEST CASE==============
@@ -1064,60 +1055,21 @@ struct Solution {
 
         // 689.999/829 12.4852s -> 9.40219s
 
-        //int k = 0;
-        auto do_step_add = [&]() {
-            /*auto foo = [&](int j) {
-                auto [TBS, n, t0, t1, ost_len] = requests[j];
-                //return TBS - (total_g[j] + add_g[t][n]); // 16200.849 points
-                //return add_g[t][n]; // 14852.862 points
-                //return add_g[t][n] + total_g[j]; // 14816.857 points
-                //return add_g[t][n] - total_g[j]; // 15001.858 points
-                //return add_g[t][n] - total_g[j] - TBS; // 15785.851 points
-                // return add_g[t][n] - total_g[j] + TBS; // 15785.851 points
-                // +total_g[j] очень плохо
-                // return -add_g[t][n] - total_g[j] - TBS; // 13007.855 points
-                // return -add_g[t][n] - total_g[j] + TBS; // 16200.849 points
-                //return -add_g[t][n] + TBS; // 16171.849 points
-
-                // return -add_g[t][n]; // 14922.852 points
-
-                // return sum_power(t, n); // 14922.865 points
-                // return -sum_power(t, n); // 14917.852 points
-                //return -add_g[t][n] + sum_power(t, n); // 14923.852 points
-                // return -add_g[t][n] - sum_power(t, n); // 14593.855 points
-                //return -add_g[t][n] + 30 * sum_power(t, n); // 14942.852 points
-                //return -add_g[t][n] + 60 * sum_power(t, n); // 14948.852 points
-                // return -add_g[t][n] + 1000 * sum_power(t, n); // 15203.85 points
-                // return -add_g[t][n] + 10000 * sum_power(t, n); // 15079.861 points
-                // return -add_g[t][n] + 5000 * sum_power(t, n); // Partial result: 14958.866 points
-                // return -add_g[t][n] + 1100 * sum_power(t, n); // 15211.849 points
-                // return -add_g[t][n] + 900 * sum_power(t, n); // 15189.85 points
-                //return -add_g[t][n] + 1200 * sum_power(t, n); // 14989.852 points
-                //return -add_g[t][n] + 1050 * sum_power(t, n); // 15217.85 points
-
-                // return -add_g[t][n] + 1050 * sum_power(t, n) + TBS; // 16191.85 points
-                // return -add_g[t][n] - total_g[j] + 1050 * sum_power(t, n) + TBS; // 16228.85 points
-                // return -add_g[t][n] - total_g[j] + 950 * sum_power(t, n) + TBS; // 16232.85 points
-                // return -add_g[t][n] - total_g[j] + 900 * sum_power(t, n) + TBS; // 16228.85 points
-
-                // return ost_len * 900 -add_g[t][n] - total_g[j] + 950 * sum_power(t, n) + TBS; // 16238.85 points
-
-                return ost_len * 900 - add_g[t][n] - total_g[j] + 950 * sum_power(t, n) + TBS; // 16238.85 points
-            };
-            sort(js.begin(), js.end(), [&](int lhs, int rhs) {
-                return foo(lhs) < foo(rhs);
-            });*/
-            //k %= K;
-
+        int k = 0;
+        int r = 0;
+        auto do_step_add = [&]() { // NOLINT
             double best_f = -1e300;
             int best_n = -1;
             int best_k = -1;
             int best_r = -1;
             double best_add = 0;
 
-            for (int n: nms) {
-                for (int k = 0; k < K; k++) {
-                    for (int r = 0; r < R; r++) {
+            for (int kek = 0; kek < 3; kek++) {
+                for (int n: nms) {
+                    //for (int k = 0; k < K; k++) {
+                    //for (int r = 0; r < R; r++) {
+                    // add
+                    {
                         double add = calc_add_power(k, r);
                         if (add != 0) {
                             update_dynamics(n, k, r, +add);
@@ -1125,11 +1077,6 @@ struct Solution {
                             update_dynamics(n, k, r, -add);
 
                             if (best_f < new_f) {
-                                /*{
-                                    fast_f();
-                                    int j = n_to_j[n];
-                                    cout << (total_g[j] + add_g[t][n] < requests[j].TBS);
-                                }*/
                                 best_f = new_f;
                                 best_n = n;
                                 best_k = k;
@@ -1138,17 +1085,72 @@ struct Solution {
                             }
                         }
                     }
+
+                    // set zero
+                    {
+                        if (p[t][n][k][r] != 0) {
+                            double x = p[t][n][k][r];
+                            update_dynamics(n, k, r, -x);
+                            double new_f = fast_f();
+                            update_dynamics(n, k, r, +x);
+
+                            if (best_f < new_f) {
+                                best_f = new_f;
+                                best_n = n;
+                                best_k = k;
+                                best_r = r;
+                                best_add = -x;
+                            }
+                        }
+                    }
+
+                    {
+                        double sub = max(0.1, p[t][n][k][r] / 2);
+                        if (sub < p[t][n][k][r]) {
+                            update_dynamics(n, k, r, -sub);
+                            double new_f = fast_f();
+                            update_dynamics(n, k, r, +sub);
+
+                            if (best_f < new_f) {
+                                best_add = -sub;
+                                best_n = n;
+                                best_f = new_f;
+                                best_k = k;
+                                best_r = r;
+                            }
+
+                        }
+                    }
+                    //}
+                    //}
                 }
+
+                k++;
+                if (k == K) {
+                    k = 0;
+                    r++;
+                    if (r == R) {
+                        r = 0;
+                    }
+                }
+
+                /*r++;
+                if (r == R) {
+                    r = 0;
+                    k++;
+                    if (k == K) {
+                        k = 0;
+                    }
+                }*/
             }
-            //cout << '\n';
 
             if (best_n == -1) {
                 //k++;
                 return false;
             }
             update_dynamics(best_n, best_k, best_r, best_add);
+            //cout << "add: " << best_n << ' ' << best_k << ' ' << best_r << ' ' << best_add << ' ' << fast_f() << endl;
             update_absolute_best();
-            //k++;
             return true;
         };
 
@@ -1201,7 +1203,7 @@ struct Solution {
                     }
                     for (int k = 0; k < K; k++) {
                         for (int r = 0; r < R; r++) {
-                            if (p[t][m][k][r] >= deltas) {
+                            if (p[t][m][k][r] > deltas) {
                                 double x = deltas;
                                 update_dynamics(m, k, r, -x);
                                 update_dynamics(n, k, r, +x);
@@ -1233,23 +1235,120 @@ struct Solution {
             return true;
         };
 
+        //1 96 8/13
+        //2 0 6/14
+        //3 3 7/14
+        //4 81 9/16
+
+        //add: 49 2 0 1 983842
+        //add: 43 0 1 1 1.98426e+06
+        //add: 13 1 3 1 2.9846e+06
+        //add: 19 0 2 1 3.98485e+06
+        //add: 31 0 1 1 4.98486e+06
+        //add: 11 0 1 1 5.98487e+06
+        //add: 46 0 4 1 5.98678e+06
+        //add: 46 1 4 1 6.98696e+06
+        //add: 16 1 3 1 6.98767e+06
+        //add: 27 2 0 1 6.98822e+06
+        //add: 16 1 3 1 6.9884e+06
+        //add: 27 2 0 1 6.98857e+06
+        //add: 16 1 3 1 6.98868e+06
+        //add: 16 2 0 1 6.98889e+06
+        //add: 49 2 2 1 7.98906e+06
+        //add: 46 3 4 1 7.98906e+06
+        //add: 23 3 4 1 7.98908e+06
+        //add: 46 3 4 1 7.98908e+06
+        //add: 23 3 4 1 7.98911e+06
+        //add: 43 3 1 1 6.98909e+06
+        //1 96 8/13
+        //add: 0 0 4 1 975158
+        //add: 45 0 0 1 1.97579e+06
+        //add: 42 0 1 1 2.97628e+06
+        //add: 20 0 1 1 3.97672e+06
+        //add: 4 0 2 1 4.97704e+06
+        //add: 9 1 3 1 5.97706e+06
+        //add: 8 1 3 1 5.97825e+06
+        //add: 19 1 3 1 5.9792e+06
+        //add: 10 1 3 1 5.97967e+06
+        //add: 0 1 4 1 5.97967e+06
+        //add: 0 2 4 1 5.97967e+06
+        //add: 19 2 4 1 5.97978e+06
+        //add: 41 2 4 1 5.97981e+06
+        //add: 0 2 4 1 5.97981e+06
+        //add: 4 2 2 1 5.97981e+06
+        //add: 4 3 2 1 5.97981e+06
+        //add: 34 3 2 1 5.97983e+06
+        //add: 34 3 2 1 5.97984e+06
+        //add: 34 3 2 1 5.97985e+06
+        //add: 45 3 0 1 5.97985e+06
+        //2 0 6/14
+        //add: 49 0 0 1 984125
+        //add: 36 0 0 1 1.98534e+06
+        //add: 25 0 1 1 2.98646e+06
+        //add: 23 0 2 1 3.98721e+06
+        //add: 18 0 3 1 4.98773e+06
+        //add: 22 1 4 1 5.98823e+06
+        //add: 29 1 4 1 6.98833e+06
+        //add: 28 1 4 1 6.98882e+06
+        //add: 28 1 4 1 6.98899e+06
+        //add: 18 1 3 1 6.98899e+06
+        //add: 18 2 3 1 6.98899e+06
+        //add: 28 2 3 1 6.98904e+06
+        //add: 28 2 3 1 6.98907e+06
+        //add: 28 2 3 1 6.98911e+06
+        //add: 23 2 2 1 6.98911e+06
+        //add: 23 3 2 1 6.98911e+06
+        //add: 28 3 2 1 6.98916e+06
+        //add: 28 3 2 1 6.9892e+06
+        //add: 28 3 2 1 6.98924e+06
+        //add: 25 3 1 1 6.98924e+06
+        //3 3 7/14
+        //add: 38 0 0 1 985447
+        //add: 4 0 1 1 1.9859e+06
+        //add: 35 0 1 1 2.98632e+06
+        //add: 22 0 2 1 3.98672e+06
+        //add: 41 0 3 1 4.98695e+06
+        //add: 9 1 4 1 5.98718e+06
+        //add: 2 1 4 1 6.98735e+06
+        //add: 40 1 4 1 7.98746e+06
+        //add: 28 1 4 1 7.98801e+06
+        //add: 6 2 3 1 7.98804e+06
+        //add: 41 1 3 1 8.98807e+06
+        //add: 22 2 2 1 8.98807e+06
+        //add: 28 2 2 1 8.9883e+06
+        //add: 28 2 2 1 8.98842e+06
+        //add: 28 2 2 1 8.98851e+06
+        //add: 38 3 0 1 8.98851e+06
+        //add: 3 3 0 1 8.98889e+06
+        //add: 3 3 0 1 8.98904e+06
+        //add: 3 3 0 1 8.98914e+06
+        //add: 41 3 3 1 8.98914e+06
+        //4 81 9/16
+        //29.9999/829 0.0441239s
+        //TIME SAMPLE: 0.0125003s
+
         int count = 2;
-        for (int step = 0; step < 1e9; step++) {
+        for (int step = 0; step < 300; step++) {
             //cout << fast_f() << "->";
             //do_step_RobinHood();
             //do_step_remove();
-
-            if (!do_step_add()) {
+            do_step_add();
+            if (false) {
+                break;
                 count--;
                 if (count <= 0) {
                     break;
                 }
                 //break; // 621.999/829
 
-                //689.999/829
-                for (int i = 0; i <= js.size() * 0.8; i++) {
-                    do_step_remove();
+                for (int kek = 0; kek < 3; kek++) {
+                    do_step_RobinHood();
                 }
+
+                //689.999/829
+                /*for (int i = 0; i <= js.size() * 0.8; i++) {
+                    do_step_remove();
+                }*/
             }
             //do_step_add();
             //do_step_remove();
@@ -1276,7 +1375,7 @@ struct Solution {
             }
             static int kek = 0;
             kek++;
-            cout << kek << ' ' << t << ' ' << count << '/' << js.size() << endl;
+            //cout << kek << ' ' << t << ' ' << count << '/' << js.size() << endl;
         }
 #endif
 
@@ -1438,6 +1537,15 @@ struct Solution {
 
         for (int step = 0; step < T; step++) {
             // выберем самое лучшее время, куда наиболее оптимально поставим силу
+
+            //96 96 8/13
+            //97 0 7/14
+            //98 3 6/14
+            //99 81 10/16
+            //for (int t: {96, 0, 3, 81}) {
+            //    set_nice_power(t, js[t]);
+            //}
+            //return;
 
             int best_time = -1;
             /// оптимальный выбор времени
@@ -1608,7 +1716,7 @@ struct Solution {
 
 int main() {
 #ifndef FAST_STREAM
-    for (int test_case = 2; test_case <= 2; test_case++) {
+    for (int test_case = 0; test_case <= 3; test_case++) {
 
         std::ifstream input("input.txt");
         if (test_case == 0) {
