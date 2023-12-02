@@ -1212,7 +1212,7 @@ struct Solution {
             }
         };
 
-        for (int step = 0; step < 50; step++) {
+        for (int step = 0; step < 30; step++) {
             //cout << fast_f() << "->";
             do_step_add();
         }
