@@ -1212,7 +1212,7 @@ struct Solution {
             }
         };
 
-        for (int step = 0; step < 30; step++) {
+        for (int step = 0; step < 20; step++) {
             //cout << fast_f() << "->";
             do_step_add();
         }
@@ -1264,7 +1264,7 @@ struct Solution {
                 auto time_stop = steady_clock::now();
                 auto duration = time_stop - global_time_start;
                 double time = duration_cast<nanoseconds>(duration).count() / 1e9;
-                if (time > 1.6) {
+                if (time > 1.8) {
                     break;
                 }
             }
@@ -1279,6 +1279,7 @@ struct Solution {
             // наиболее оптимально расставим силу в момент времени best_time
             count_visited[best_time]++;
             set_nice_power(best_time, js[best_time]);
+
 
             {
                 double weight = 0;
