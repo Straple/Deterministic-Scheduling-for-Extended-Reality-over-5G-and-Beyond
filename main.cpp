@@ -364,7 +364,7 @@ void my_time_end() {
 }
 
 struct request_t {
-    int TBS;
+    double TBS;
     int n;
     int t0;
     int t1;
@@ -526,6 +526,7 @@ struct Solution {
             input >> requests[j].n;
             input >> t0 >> td;
 #endif
+            requests[j].TBS += 1e-9;
             int t1 = t0 + td - 1;
 
             requests[j].t0 = t0;
@@ -904,7 +905,7 @@ struct Solution {
             auto [TBS, n, t0, t1] = requests[j];
             double g = get_g(t, n);
             double x = 0;
-            if (g + main_total_g[j] - main_add_g[t][n] >= TBS) {
+            if (g + main_total_g[j] - main_add_g[t][n] > TBS) {
                 x += 1e6;
             } else {
                 x += g - TBS;
@@ -933,7 +934,7 @@ struct Solution {
             update_add_g(t, n);
             double x = 0;
             // TODO: улучшить эту метрику
-            if (add_g[t][n] + main_total_g[j] - main_add_g[t][n] >= TBS) {
+            if (add_g[t][n] + main_total_g[j] - main_add_g[t][n] > TBS) {
                 x += 1e6;
             } else {
                 x += add_g[t][n] - TBS;
@@ -963,7 +964,7 @@ struct Solution {
             ASSERT(high_equal(dp_power_sum[t][k][r], sum), "kek");
             ASSERT(sum <= 4 + 1e-9, "fatal");
 #endif
-            add = min(add, 4 + 1e-12 - dp_power_sum[t][k][r]);
+            add = min(add, 4 - 1e-9 - dp_power_sum[t][k][r]);
         }
 
         {
@@ -975,9 +976,9 @@ struct Solution {
             ASSERT(high_equal(sum, dp_power_sum2[t][k]), "kek");
             ASSERT(sum <= R + 1e-9, "fatal");
 #endif
-            add = min(add, R + 1e-12 - dp_power_sum2[t][k]);
+            add = min(add, R - 1e-9 - dp_power_sum2[t][k]);
         }
-        if (add < 1e-8) {
+        if (add < 1e-7) {
             add = 0;
         }
         return add;
@@ -1011,7 +1012,7 @@ struct Solution {
                 for (int j: js[time]) {
                     auto [TBS, n, t0, t1] = requests[j];
                     double x = 0;
-                    if (main_total_g[j] >= TBS) {
+                    if (main_total_g[j] > TBS) {
                         x += 1e6;
                     } else {
                         x += main_add_g[time][n] - TBS;
@@ -1074,7 +1075,7 @@ struct Solution {
 
         for (int j: js) {
             auto [TBS, n, t0, t1] = requests[j];
-            if (add_g[t][n] + main_total_g[j] - main_add_g[t][n] < TBS) {
+            if (add_g[t][n] + main_total_g[j] - main_add_g[t][n] <= TBS) {
                 view[n] = true; // get_rnd() > (add_g[t][n] + main_total_g[j] - main_add_g[t][n]) / TBS;
             } else {
                 view[n] = get_rnd() < 0.5;
@@ -1090,7 +1091,7 @@ struct Solution {
                     update_add_g(t, n);
                     double x = 0;
                     // TODO: улучшить эту метрику
-                    if (add_g[t][n] + main_total_g[j] - main_add_g[t][n] >= TBS) {
+                    if (add_g[t][n] + main_total_g[j] - main_add_g[t][n] > TBS) {
                         x += 1e6;
                     } else {
                         x += add_g[t][n] - TBS;
@@ -1173,15 +1174,6 @@ struct Solution {
                             }
                         }
                     }
-
-                    /*r++;
-                    if (r == R) {
-                        r = 0;
-                        k++;
-                        if (k == K) {
-                            k = 0;
-                        }
-                    }*/
                 }
             }
 
@@ -1213,7 +1205,7 @@ struct Solution {
     void solve() {
         vector<int> count_visited(T);
 
-        set <pair<double, int>> Q;
+        set<pair<double, int>> Q;
         for (int t = 0; t < T; t++) {
             if (!js[t].empty()) {
                 Q.insert({js[t].size() - 1e5, t});
@@ -1254,7 +1246,7 @@ struct Solution {
                 int count_accepted = 0;
                 for (int j: js[best_time]) {
                     auto [TBS, n, t0, t1] = requests[j];
-                    count_accepted += main_total_g[j] >= TBS;
+                    count_accepted += main_total_g[j] > TBS;
                 }
                 weight -= pow((int) js[best_time].size() - count_accepted, 3);
 
@@ -1294,7 +1286,7 @@ struct Solution {
             }
             ASSERT(high_equal(g, main_total_g[j]), "oh ho :_(");
 #endif
-            X += main_total_g[j] >= requests[j].TBS;
+            X += main_total_g[j] > requests[j].TBS;
         }
         return X - 1e-6 * power_sum;
     }
