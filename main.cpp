@@ -311,7 +311,7 @@ bool high_equal(double x, double y) {
     return abs(x - y) <= 1e-9 * max({abs(x), abs(y)});
 }
 
-//#define FAST_STREAM
+#define FAST_STREAM
 
 //#define PRINT_DEBUG_INFO
 
@@ -370,6 +370,12 @@ struct request_t {
     int t1;
 };
 
+constexpr uint32_t MAX_N = 100;
+constexpr uint32_t MAX_K = 10;
+constexpr uint32_t MAX_T = 1000;
+constexpr uint32_t MAX_R = 10;
+constexpr uint32_t MAX_J = 5000;
+
 struct Solution {
     int N;
     int K;
@@ -378,75 +384,78 @@ struct Solution {
     int J;
 
     // s0[t][n][k][r]
-    vector<vector<vector<vector<double>>>> s0;
+    double s0[MAX_T][MAX_N][MAX_K][MAX_R];
 
     // s0[t][k][r][n]
-    vector<vector<vector<vector<double>>>> s0_tkrn;
+    double s0_tkrn[MAX_T][MAX_K][MAX_R][MAX_N];
 
     // d[n][m][k][r]
-    vector<vector<vector<vector<double>>>> d;
+    double d[MAX_N][MAX_N][MAX_K][MAX_R];
 
     // exp_d[n][m][k][r]
-    vector<vector<vector<vector<double>>>> exp_d;
+    double exp_d[MAX_N][MAX_N][MAX_K][MAX_R];
 
     // exp_d_2[n][k][r][m]
-    vector<vector<vector<vector<double>>>> exp_d_2;
+    double exp_d_2[MAX_N][MAX_K][MAX_R][MAX_N];
 
     // exp_d_pow[n][m][k][r]
-    vector<vector<vector<vector<double>>>> exp_d_pow;
+    double exp_d_pow[MAX_N][MAX_N][MAX_K][MAX_R];
 
     vector<request_t> requests;
 
     // p[t][n][k][r]
-    vector<vector<vector<vector<double>>>> p;
+    double p[MAX_T][MAX_N][MAX_K][MAX_R];
 
-    vector<vector<vector<vector<double>>>> main_best_p;
+    double main_p[MAX_T][MAX_N][MAX_K][MAX_R];
 
     // main_total_g[j]
-    vector<double> main_total_g;
+    double main_total_g[MAX_J];
 
     // add_g[t][n]
-    vector<vector<double>> add_g;
+    double add_g[MAX_T][MAX_N];
 
-    // main_best_add_g[t][n]
-    vector<vector<double>> main_add_g;
+    // main_add_g[t][n]
+    double main_add_g[MAX_T][MAX_N];
 
     // main_best_f[t]
-    vector<double> main_best_f;
+    double main_best_f[MAX_T];
 
     // dp_exp_d_prod[t][n][k][r]
-    vector<vector<vector<vector<double>>>> dp_exp_d_prod;
+    double dp_exp_d_prod[MAX_T][MAX_N][MAX_K][MAX_R];
 
     // dp_s[t][n][k][r]
-    vector<vector<vector<vector<double>>>> dp_s;
+    double dp_s[MAX_T][MAX_N][MAX_K][MAX_R];
 
     // dp_prod_s[t][n][k]
-    vector<vector<vector<double>>> dp_prod_s;
+    double dp_prod_s[MAX_T][MAX_N][MAX_K];
 
     // dp_count[t][n][k]
-    vector<vector<vector<int>>> dp_count;
+    int dp_count[MAX_T][MAX_N][MAX_K];
 
-    // dp_denom_sum[t][n][k]
-    vector<vector<vector<vector<double>>>> dp_denom_sum;
+    // dp_denom_sum[t][n][k][r]
+    double dp_denom_sum[MAX_T][MAX_N][MAX_K][MAX_R];
 
     // dp_denom_sum_global_add[t][n][r]
-    vector<vector<vector<double>>> dp_denom_sum_global_add;
+    double dp_denom_sum_global_add[MAX_T][MAX_N][MAX_R];
 
     // dp_power_sum[t][k][r]
-    vector<vector<vector<double>>> dp_power_sum;
+    double dp_power_sum[MAX_T][MAX_K][MAX_R];
 
-    // dp_power_sum2[k]
-    vector<vector<double>> dp_power_sum2;
+    // dp_power_sum2[t][k]
+    double dp_power_sum2[MAX_T][MAX_K];
 
     // js[t]
-    vector<vector<int>> js;
+    vector<int> js[MAX_T];
 
-    vector<vector<int>> nms;
+    vector<int> nms[MAX_T];
 
     map<int, int> cast_n_to_j;
 
-    // save_kr[t] = (k, r)
-    vector<pair<int, int>> save_kr;
+    // save_kr[t][n] = (k, r)
+    int save_kr_index[MAX_T][MAX_N];
+
+    // permute_kr[t][n]
+    vector<pair<int, int>> permute_kr[MAX_T][MAX_N];
 
     void read(
 #ifndef FAST_STREAM
@@ -462,9 +471,6 @@ struct Solution {
 #else
         input >> N >> K >> T >> R;
 #endif
-
-        s0.assign(T, vector(N, vector(K, vector<double>(R))));
-        s0_tkrn.assign(T, vector(K, vector(R, vector<double>(N))));
         for (int t = 0; t < T; t++) {
             for (int k = 0; k < K; k++) {
                 for (int r = 0; r < R; r++) {
@@ -480,10 +486,6 @@ struct Solution {
             }
         }
 
-        d.assign(N, vector(N, vector(K, vector<double>(R))));
-        exp_d.assign(N, vector(N, vector(K, vector<double>(R))));
-        exp_d_2.assign(N, vector(K, vector(R, vector<double>(N))));
-        exp_d_pow.assign(N, vector(N, vector(K, vector<double>(R))));
         for (int k = 0; k < K; k++) {
             for (int r = 0; r < R; r++) {
                 for (int m = 0; m < N; m++) {
@@ -494,7 +496,6 @@ struct Solution {
                         input >> d[n][m][k][r];
 #endif
                         exp_d[n][m][k][r] = exp(d[n][m][k][r]);
-
                         exp_d_2[n][k][r][m] = exp_d[n][m][k][r];
                         exp_d_pow[n][m][k][r] = pow(exp_d[n][m][k][r], 3);
                     }
@@ -531,31 +532,17 @@ struct Solution {
             requests[j].t1 = t1;
         }
 
-        dp_exp_d_prod.assign(T, vector(N, vector(K, vector<double>(R, 1))));
-
-        dp_s.assign(T, vector(N, vector(K, vector<double>(R))));
-
-        dp_prod_s.assign(T, vector(N, vector<double>(K, 1)));
-
-        dp_count.assign(T, vector(N, vector<int>(K)));
-
-        dp_denom_sum.assign(T, vector(N, vector(K, vector<double>(R, 1))));
-
-        dp_denom_sum_global_add.assign(T, vector(N, vector<double>(R)));
-
-        dp_power_sum.assign(T, vector(K, vector<double>(R)));
-
-        dp_power_sum2.assign(T, vector<double>(K));
-
-        p.assign(T, vector(N, vector(K, vector<double>(R))));
-        main_best_p = p;
-
-        main_total_g.assign(J, 0);
-
-        add_g.assign(T, vector<double>(N));
-
-        js.assign(T, {});
-        nms.assign(T, {});
+        for (int t = 0; t < T; t++) {
+            for (int n = 0; n < N; n++) {
+                for (int k = 0; k < K; k++) {
+                    dp_prod_s[t][n][k] = 1;
+                    for (int r = 0; r < R; r++) {
+                        dp_exp_d_prod[t][n][k][r] = 1;
+                        dp_denom_sum[t][n][k][r] = 1;
+                    }
+                }
+            }
+        }
 
         for (int j = 0; j < J; j++) {
             auto [TBS, n, t0, t1] = requests[j];
@@ -569,23 +556,70 @@ struct Solution {
             sort(nms[t].begin(), nms[t].end());
         }
 
-        main_add_g.assign(T, vector<double>(N));
+        for (int t = 0; t < T; t++) {
+            main_best_f[t] = -1e300;
+        }
 
-        main_best_f.assign(T, -1e300);
+        for (int t = 0; t < T; t++) {
+            for (int n = 0; n < N; n++) {
+                permute_kr[t][n].reserve(K * R);
+                for (int k = 0; k < K; k++) {
+                    for (int r = 0; r < R; r++) {
+                        permute_kr[t][n].emplace_back(k, r);
+                    }
+                }
 
-        save_kr.assign(T, {0, 0});
+                sort(permute_kr[t][n].begin(), permute_kr[t][n].end(), [&](const auto &lhs, const auto &rhs) {
+                    return s0[t][n][lhs.first][lhs.second] > s0[t][n][rhs.first][rhs.second];
+                });
+            }
+        }
+
+        /*for (int t = 0; t < T; t++) {
+            for (int n = 0; n < N; n++) {
+                vector<tuple<double, int, int>> kek;
+                kek.reserve(K * R);
+                for (int k = 0; k < K; k++) {
+                    for (int r = 0; r < R; r++) {
+                        kek.emplace_back(s0[t][n][k][r], k, r);
+                    }
+                }
+                sort(kek.begin(), kek.end(), greater<>());
+                while (kek.size() > K * R * 0.7) {
+                    kek.pop_back();
+                }
+                for (auto [weight, k, r]: kek) {
+                    used[t][n][k][r] = true;
+                }
+            }
+        }*/
+
+        /*for (int t = 0; t < T; t++) {
+            for (int n = 0; n < N; n++) {
+                auto &[best_k, best_r] = save_kr[t][n];
+                for (int k = 0; k < K; k++) {
+                    for (int r = 0; r < R; r++) {
+                        if (s0[t][n][k][r] > s0[t][n][best_k][best_r]) {
+                            best_k = k;
+                            best_r = r;
+                        }
+                    }
+                }
+            }
+        }*/
     }
 
     void print() {
+        //ofstream cout("output.txt");
         for (int t = 0; t < T; t++) {
             for (int k = 0; k < K; k++) {
                 for (int r = 0; r < R; r++) {
                     for (int n = 0; n < N; n++) {
 #ifdef FAST_STREAM
-                        writeDouble(main_best_p[t][n][k][r]);
+                        writeDouble(main_p[t][n][k][r]);
                         writeChar(' ');
 #else
-                        cout << main_best_p[t][n][k][r] << ' ';
+                        cout << main_p[t][n][k][r] << ' ';
 #endif
                     }
 #ifdef FAST_STREAM
@@ -966,7 +1000,7 @@ struct Solution {
             for (int n = 0; n < N; n++) {
                 for (int k = 0; k < K; k++) {
                     for (int r = 0; r < R; r++) {
-                        main_best_p[t][n][k][r] = p[t][n][k][r];
+                        main_p[t][n][k][r] = p[t][n][k][r];
                     }
                 }
             }
@@ -988,14 +1022,17 @@ struct Solution {
         }
 
 #ifdef DEBUG_MODE
-        auto save_p = p;
-        p = main_best_p;
         for (int t = 0; t < T; t++) {
-            ASSERT(
-                    main_best_f[t] < -1e200 ||
-                    high_equal(main_best_f[t], correct_f(t)),
-                    "kek"
-            );
+            for (int n = 0; n < N; n++) {
+                for (int k = 0; k < K; k++) {
+                    for (int r = 0; r < R; r++) {
+                        swap(p[t][n][k][r], main_p[t][n][k][r]);
+                    }
+                }
+            }
+        }
+        for (int t = 0; t < T; t++) {
+            ASSERT(main_best_f[t] < -1e200 || high_equal(main_best_f[t], correct_f(t)), "kek");
         }
 
         for (int j = 0; j < J; j++) {
@@ -1008,18 +1045,24 @@ struct Solution {
             ASSERT(high_equal(g, main_total_g[j]), "kek");
         }
 
-        p = save_p;
+        for (int t = 0; t < T; t++) {
+            for (int n = 0; n < N; n++) {
+                for (int k = 0; k < K; k++) {
+                    for (int r = 0; r < R; r++) {
+                        swap(p[t][n][k][r], main_p[t][n][k][r]);
+                    }
+                }
+            }
+        }
 #endif
     }
 
-    void deterministic_descent(int t, vector<int> js) {
-        double add_power_value = 1.0;
+    void deterministic_descent(int t, const vector<int> &js) {
+        double add_power_value = 1;
 
         double remove_power_value = 0.3;
 
         relax_main_version(t);
-
-        double take_power_value = 0.3;
 
         vector<bool> view(N);
         vector<bool> dont_touch(N);
@@ -1047,9 +1090,7 @@ struct Solution {
                     update_add_g(t, n);
                     double x = 0;
                     // TODO: улучшить эту метрику
-                    if (add_g[t][n] + main_total_g[j] -
-                        main_add_g[t][n] >=
-                        TBS) {
+                    if (add_g[t][n] + main_total_g[j] - main_add_g[t][n] >= TBS) {
                         x += 1e6;
                     } else {
                         x += add_g[t][n] - TBS;
@@ -1060,91 +1101,23 @@ struct Solution {
             return result;
         };
 
-        /*auto RobinHood = [&](int n, int k, int r) { // NOLINT
-            // посмотрим у кого мы можем отобрать силу, чтобы взять ее себе
-
-            double best_f = -1e300;
-            int best_m = -1;
-
-            vector<tuple<double, int>> kek;
-            for (int j: js) {
-                int m = requests[j].n;
-                //for (int m: nms[t]) {
-                if (n != m) {
-                    if (p[t][m][k][r] > take_power_value) {
-                        // kek.emplace_back((total_g[j] + add_g[t][m]) -
-        requests[j].TBS, m); // 16067.854 points
-                        // TODO: рассматривать add_g[t][n] / sum_power
-                        // типа то, сколько мы получаем g за единицу вложенной
-        силы
-
-                        //kek.emplace_back(0.5 * (total_g[j] + add_g[t][m]) /
-        requests[j].TBS +
-                        //                 add_g[t][m] / sum_power, m);
-
-                        //kek.emplace_back(2 * (total_g[j] + add_g[t][m]) /
-        requests[j].TBS +
-                        //                 add_g[t][m] / sum_power, m); //
-        16027.854 points
-
-                        //kek.emplace_back((total_g[j] + add_g[t][m]) /
-        requests[j].TBS +
-                        //add_g[t][m] / sum_power, m); // 16025.854 points
-
-                        //kek.emplace_back((total_g[j] + add_g[t][m]) /
-        requests[j].TBS, m);// 16064.854 points
-                        //kek.emplace_back(add_g[t][m] - requests[j].TBS, m); //
-        16067.854 points
-                        //kek.emplace_back(add_g[t][m], m); // 16006.854 points
-                        // kek.emplace_back(-add_g[t][m] / sum_power, m); //
-        15957.855 points
-                        // kek.emplace_back(add_g[t][m] / sum_power, m); //
-        16024.854 points
-
-                        kek.emplace_back(add_g[t][m] - requests[j].TBS, m);
-                    }
-                }
-            }
-            sort(kek.begin(), kek.end(), greater<>());
-
-            for (auto [weight, m]: kek) {
-                ASSERT(verify_power(t), "failed power");
-                change_power(t, m, k, r, -take_power_value);
-                ASSERT(verify_power(t), "failed power");
-                change_power(t, n, k, r, +take_power_value);
-                ASSERT(verify_power(t), "failed power");
-
-                double new_f = fast_f(t);
-
-                if (new_f > best_f) {
-                    best_f = new_f;
-                    best_m = m;
-                }
-
-                change_power(t, n, k, r, -take_power_value);
-                ASSERT(verify_power(t), "failed power");
-                change_power(t, m, k, r, +take_power_value);
-                ASSERT(verify_power(t), "failed power");
-                break;
-            }
-
-            return tuple{best_f, take_power_value, best_m};
-        };*/
-
-        auto &[k, r] = save_kr[t];
-
         auto do_step = [&]() {  // NOLINT
             double best_f = -1e300;
             int best_n = -1;
-            int best_m = -1;
             int best_k = -1;
             int best_r = -1;
             double best_add = 0;
 
-            for (int step = 0; step < 3; step++) {
-                for (int n: nms[t]) {
-                    if (dont_touch[n]) {
-                        continue;
+            for (int n: nms[t]) {
+                if (dont_touch[n]) {
+                    continue;
+                }
+                for (int step = 0; step < 2; step++) {
+                    int &i = save_kr_index[t][n];
+                    auto [k, r] = permute_kr[t][n][i];
+                    i++;
+                    if (i == permute_kr[t][n].size()) {
+                        i = 0;
                     }
 
                     // add
@@ -1158,7 +1131,6 @@ struct Solution {
                             if (best_f < new_f) {
                                 best_f = new_f;
                                 best_n = n;
-                                best_m = -1;
                                 best_k = k;
                                 best_r = r;
                                 best_add = add;
@@ -1177,7 +1149,6 @@ struct Solution {
                             if (best_f < new_f) {
                                 best_f = new_f;
                                 best_n = n;
-                                best_m = -1;
                                 best_k = k;
                                 best_r = r;
                                 best_add = -x;
@@ -1196,7 +1167,6 @@ struct Solution {
                             if (best_f < new_f) {
                                 best_add = -sub;
                                 best_n = n;
-                                best_m = -1;
                                 best_f = new_f;
                                 best_k = k;
                                 best_r = r;
@@ -1204,72 +1174,31 @@ struct Solution {
                         }
                     }
 
-                    // Robin Hood
-                    /*{
-                        auto [new_f, take_power, m] = RobinHood(n, k, r);
-                        if (m != -1) {
-                            if (best_f < new_f) {
-                                best_add = take_power;
-                                best_n = n;
-                                best_m = m;
-                                best_f = new_f;
-                                best_k = k;
-                                best_r = r;
-                            }
+                    /*r++;
+                    if (r == R) {
+                        r = 0;
+                        k++;
+                        if (k == K) {
+                            k = 0;
                         }
                     }*/
                 }
-
-                r++;
-                if (r == R) {
-                    r = 0;
-                    k++;
-                    if (k == K) {
-                        k = 0;
-                    }
-                }
-                /*k++;
-                if (k == K) {
-                    k = 0;
-                    r++;
-                    if (r == R) {
-                        r = 0;
-                    }
-                }*/
             }
 
-            if (best_m != -1) {
-                // Robin Hood
-                change_power(t, best_m, best_k, best_r, -best_add);
-                change_power(t, best_n, best_k, best_r, +best_add);
-                ASSERT(verify_power(t), "failed power");
-                relax_main_version(t);
-            } else if (best_n != -1) {
-                change_power(t, best_n, best_k, best_r, best_add);
-                relax_main_version(t);
+            if (best_n == -1) {
+                return;
             }
+
+            change_power(t, best_n, best_k, best_r, best_add);
+            relax_main_version(t);
         };
 
-        for (int step = 0; step < 20; step++) {
+        for (int step = 0; step < 30; step++) {
             do_step();
         }
-
-/*#ifndef FAST_STREAM
-        {
-            int count = 0;
-            for (int j: js) {
-                count += total_g[j] + get_g(t, requests[j].n) >=
-requests[j].TBS;
-            }
-            static int kek = 0;
-            kek++;
-            //cout << kek << ' ' << t << ' ' << count << '/' <<
-js.size() << endl;
-        }
-#endif*/
     }
 
-    void set_nice_power(int t, vector<int> js) {
+    void set_nice_power(int t, const vector<int> &js) {
         if (js.empty()) {
             return;
         }
@@ -1302,8 +1231,7 @@ js.size() << endl;
             {
                 auto time_stop = steady_clock::now();
                 auto duration = time_stop - global_time_start;
-                double time =
-                        duration_cast<nanoseconds>(duration).count() / 1e9;
+                double time = duration_cast<nanoseconds>(duration).count() / 1e9;
                 if (time > 1.8) {
                     break;
                 }
@@ -1328,30 +1256,9 @@ js.size() << endl;
                     auto [TBS, n, t0, t1] = requests[j];
                     count_accepted += main_total_g[j] >= TBS;
                 }
-                weight += count_accepted;
-                weight -= js.size();
+                weight += count_accepted - (int) js[best_time].size();
 
                 Q.insert({weight, best_time});
-
-                /*double weight = 0;
-                weight += count_visited[best_time] * 1e5;
-                int count_accepted = 0;
-                double lol = 0;
-                for (int j: js[best_time]) {
-                    auto [TBS, n, t0, t1] = requests[j];
-                    count_accepted += main_total_g[j] >= TBS;
-
-                    //lol += max(1.0, (add_g[best_time][n] + main_total_g[j]
-                - main_add_g[best_time][n]) / TBS);
-                    //weight -= 1e3 * max(1.0, (add_g[best_time][n] +
-                main_total_g[j] - main_add_g[best_time][n]) / TBS);
-                }
-                //weight += 1e3 * lol;// / js.size();
-                weight += count_accepted * 1e3;
-
-                //weight -= ((int) js[best_time].size() - count_accepted) * 3;
-
-                Q.insert({weight, best_time});*/
             }
         }
 #ifndef FAST_STREAM
@@ -1371,8 +1278,8 @@ js.size() << endl;
             for (int n = 0; n < N; n++) {
                 for (int k = 0; k < K; k++) {
                     for (int r = 0; r < R; r++) {
-                        power_sum += main_best_p[t][n][k][r];
-                        p[t][n][k][r] = main_best_p[t][n][k][r];
+                        power_sum += main_p[t][n][k][r];
+                        p[t][n][k][r] = main_p[t][n][k][r];
                     }
                 }
             }
@@ -1475,7 +1382,7 @@ js.size() << endl;
         ASSERT(correct_get_g(t, n) == 192 * sum, "failed calc");
         return 192 * sum;
     }
-};
+} solution;
 
 int main() {
     std::ios::sync_with_stdio(false);
@@ -1483,7 +1390,7 @@ int main() {
     std::cout.tie(0);
 
 #ifndef FAST_STREAM
-    for (int test_case = 1; test_case <= 3; test_case++) {
+    for (int test_case = 2; test_case <= 2; test_case++) {
         std::ifstream input("input.txt");
         if (test_case == 0) {
             input = std::ifstream("input.txt");
@@ -1499,29 +1406,29 @@ int main() {
         cout << "TEST CASE==============\n";
 #endif
 
-        global_time_start = steady_clock::now();
+    global_time_start = steady_clock::now();
 
-        Solution solution;
 #ifdef FAST_STREAM
-        solution.read();
+    solution.read();
 #else
-        solution.read(input);
+    solution.read(input);
 #endif
 
-        solution.solve();
+    solution.solve();
 
 #ifndef FAST_STREAM
-        auto time_stop = steady_clock::now();
-        auto duration = time_stop - global_time_start;
-        double time = duration_cast<nanoseconds>(duration).count() / 1e9;
-        cout << solution.get_score() << '/' << solution.J << ' ' << time << "s"
-             << endl;
-        cout << "ACCUM TIME: " << accum_time << "s" << endl;
-        accum_time = 0;
+    auto time_stop = steady_clock::now();
+    auto duration = time_stop - global_time_start;
+    double time = duration_cast<nanoseconds>(duration).count() / 1e9;
+    cout << solution.get_score() << '/' << solution.J << ' ' << time << "s"
+         << endl;
+    cout << "ACCUM TIME: " << accum_time << "s" << endl;
+    accum_time = 0;
 #endif
 
+
 #ifdef FAST_STREAM
-        solution.print();
+    solution.print();
 #endif
 
 #ifndef FAST_STREAM
