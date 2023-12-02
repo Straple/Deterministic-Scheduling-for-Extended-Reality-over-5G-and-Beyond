@@ -1213,7 +1213,7 @@ struct Solution {
     void solve() {
         vector<int> count_visited(T);
 
-        set<pair<double, int>> Q;
+        set <pair<double, int>> Q;
         for (int t = 0; t < T; t++) {
             if (!js[t].empty()) {
                 Q.insert({js[t].size() - 1e5, t});
@@ -1250,13 +1250,13 @@ struct Solution {
 
             {
                 double weight = 0;
-                weight += count_visited[best_time] * count_visited[best_time];
+                weight += count_visited[best_time] * count_visited[best_time] * 100;
                 int count_accepted = 0;
                 for (int j: js[best_time]) {
                     auto [TBS, n, t0, t1] = requests[j];
                     count_accepted += main_total_g[j] >= TBS;
                 }
-                weight += count_accepted - (int) js[best_time].size();
+                weight -= pow((int) js[best_time].size() - count_accepted, 3);
 
                 Q.insert({weight, best_time});
             }
