@@ -311,7 +311,7 @@ bool high_equal(double x, double y) {
     return abs(x - y) <= 1e-9 * max({abs(x), abs(y)});
 }
 
-//#define FAST_STREAM
+#define FAST_STREAM
 
 //#define PRINT_DEBUG_INFO
 
@@ -997,16 +997,112 @@ struct Solution {
 
         relax_absolute_best(t);
 
+        double take_power_value = 0.3;
+
+        vector<bool> kek(N);
+        static mt19937 rnd(42);
+        for (int j: js) {
+            auto [TBS, n, t0, t1] = requests[j];
+            kek[n] = add_g[t][n] + absolute_total_g[j] - absolute_add_g[t][n] < TBS;
+            if (rnd() & 1) {
+                kek[n] = true;
+            }
+        }
+
+        auto my_f = [&]() {
+            double result = 0;
+            for (int j: js) {
+                auto [TBS, n, t0, t1] = requests[j];
+                if (kek[n]) {
+                    update_add_g(t, n);
+                    double x = 0;
+                    // TODO: улучшить эту метрику
+                    if (add_g[t][n] + absolute_total_g[j] - absolute_add_g[t][n] >= TBS) {
+                        x += 1e6;
+                    } else {
+                        x += add_g[t][n] - TBS;
+                    }
+                    result += x;
+                }
+            }
+            return result;
+        };
+
+        /*auto RobinHood = [&](int n, int k, int r) { // NOLINT
+            // посмотрим у кого мы можем отобрать силу, чтобы взять ее себе
+
+            double best_f = -1e300;
+            int best_m = -1;
+
+            vector<tuple<double, int>> kek;
+            for (int j: js) {
+                int m = requests[j].n;
+                //for (int m: nms[t]) {
+                if (n != m) {
+                    if (p[t][m][k][r] > take_power_value) {
+                        // kek.emplace_back((total_g[j] + add_g[t][m]) - requests[j].TBS, m); // 16067.854 points
+                        // TODO: рассматривать add_g[t][n] / sum_power
+                        // типа то, сколько мы получаем g за единицу вложенной силы
+
+                        //kek.emplace_back(0.5 * (total_g[j] + add_g[t][m]) / requests[j].TBS +
+                        //                 add_g[t][m] / sum_power, m);
+
+                        //kek.emplace_back(2 * (total_g[j] + add_g[t][m]) / requests[j].TBS +
+                        //                 add_g[t][m] / sum_power, m); // 16027.854 points
+
+                        //kek.emplace_back((total_g[j] + add_g[t][m]) / requests[j].TBS +
+                        //add_g[t][m] / sum_power, m); // 16025.854 points
+
+                        //kek.emplace_back((total_g[j] + add_g[t][m]) / requests[j].TBS, m);// 16064.854 points
+                        //kek.emplace_back(add_g[t][m] - requests[j].TBS, m); // 16067.854 points
+                        //kek.emplace_back(add_g[t][m], m); // 16006.854 points
+                        // kek.emplace_back(-add_g[t][m] / sum_power, m); // 15957.855 points
+                        // kek.emplace_back(add_g[t][m] / sum_power, m); // 16024.854 points
+
+                        kek.emplace_back(add_g[t][m] - requests[j].TBS, m);
+                    }
+                }
+            }
+            sort(kek.begin(), kek.end(), greater<>());
+
+            for (auto [weight, m]: kek) {
+                ASSERT(verify_power(t), "failed power");
+                change_power(t, m, k, r, -take_power_value);
+                ASSERT(verify_power(t), "failed power");
+                change_power(t, n, k, r, +take_power_value);
+                ASSERT(verify_power(t), "failed power");
+
+                double new_f = fast_f(t);
+
+                if (new_f > best_f) {
+                    best_f = new_f;
+                    best_m = m;
+                }
+
+                change_power(t, n, k, r, -take_power_value);
+                ASSERT(verify_power(t), "failed power");
+                change_power(t, m, k, r, +take_power_value);
+                ASSERT(verify_power(t), "failed power");
+                break;
+            }
+
+            return tuple{best_f, take_power_value, best_m};
+        };*/
+
         auto &[k, r] = save_kr[t];
         auto do_step_add = [&]() { // NOLINT
             double best_f = -1e300;
             int best_n = -1;
+            int best_m = -1;
             int best_k = -1;
             int best_r = -1;
             double best_add = 0;
 
-            for (int kek = 0; kek < 3; kek++) {
+            for (int step = 0; step < 3; step++) {
                 for (int n: nms[t]) {
+                    if (!kek[n]) {
+                        continue;
+                    }
                     //for (int k = 0; k < K; k++) {
                     //for (int r = 0; r < R; r++) {
                     // add
@@ -1014,12 +1110,13 @@ struct Solution {
                         double add = calc_may_add_power(t, k, r, add_power_value);
                         if (add != 0) {
                             change_power(t, n, k, r, +add);
-                            double new_f = fast_f(t);
+                            double new_f = my_f();
                             change_power(t, n, k, r, -add);
 
                             if (best_f < new_f) {
                                 best_f = new_f;
                                 best_n = n;
+                                best_m = -1;
                                 best_k = k;
                                 best_r = r;
                                 best_add = add;
@@ -1032,12 +1129,13 @@ struct Solution {
                         if (p[t][n][k][r] != 0) {
                             double x = p[t][n][k][r];
                             change_power(t, n, k, r, -x);
-                            double new_f = fast_f(t);
+                            double new_f = my_f();
                             change_power(t, n, k, r, +x);
 
                             if (best_f < new_f) {
                                 best_f = new_f;
                                 best_n = n;
+                                best_m = -1;
                                 best_k = k;
                                 best_r = r;
                                 best_add = -x;
@@ -1050,12 +1148,13 @@ struct Solution {
                         double sub = max(0.1, p[t][n][k][r] / 2);
                         if (sub < p[t][n][k][r]) {
                             change_power(t, n, k, r, -sub);
-                            double new_f = fast_f(t);
+                            double new_f = my_f();
                             change_power(t, n, k, r, +sub);
 
                             if (best_f < new_f) {
                                 best_add = -sub;
                                 best_n = n;
+                                best_m = -1;
                                 best_f = new_f;
                                 best_k = k;
                                 best_r = r;
@@ -1063,38 +1162,57 @@ struct Solution {
 
                         }
                     }
+
+                    // Robin Hood
+                    /*{
+                        auto [new_f, take_power, m] = RobinHood(n, k, r);
+                        if (m != -1) {
+                            if (best_f < new_f) {
+                                best_add = take_power;
+                                best_n = n;
+                                best_m = m;
+                                best_f = new_f;
+                                best_k = k;
+                                best_r = r;
+                            }
+                        }
+                    }*/
                     //}
                     //}
                 }
 
-                k++;
+                /*k++;
                 if (k == K) {
                     k = 0;
                     r++;
                     if (r == R) {
                         r = 0;
                     }
-                }
+                }*/
 
-                /*r++;
+                r++;
                 if (r == R) {
                     r = 0;
                     k++;
                     if (k == K) {
                         k = 0;
                     }
-                }*/
+                }
             }
 
-            if (best_n == -1) {
-                return false;
+            if (best_m != -1) {
+                // Robin Hood
+                change_power(t, best_m, best_k, best_r, -best_add);
+                change_power(t, best_n, best_k, best_r, +best_add);
+                ASSERT(verify_power(t), "failed power");
+                relax_absolute_best(t);
+            } else if (best_n != -1) {
+                change_power(t, best_n, best_k, best_r, best_add);
+                relax_absolute_best(t);
             }
-            change_power(t, best_n, best_k, best_r, best_add);
-            relax_absolute_best(t);
-            return true;
         };
 
-        for (int step = 0; step < 10; step++) {
+        for (int step = 0; step < 50; step++) {
             //cout << fast_f() << "->";
             do_step_add();
         }
@@ -1321,28 +1439,28 @@ int main() {
         cout << "TEST CASE==============\n";
 #endif
 
-        global_time_start = steady_clock::now();
+    global_time_start = steady_clock::now();
 
-        Solution solution;
+    Solution solution;
 #ifdef FAST_STREAM
-        solution.read();
+    solution.read();
 #else
-        solution.read(input);
+    solution.read(input);
 #endif
 
-        solution.solve();
+    solution.solve();
 
 #ifndef FAST_STREAM
-        auto time_stop = steady_clock::now();
-        auto duration = time_stop - global_time_start;
-        double time = duration_cast<nanoseconds>(duration).count() / 1e9;
-        cout << solution.get_score() << '/' << solution.J << ' ' << time << "s" << endl;
-        cout << "ACCUM TIME: " << accum_time << "s" << endl;
-        accum_time = 0;
+    auto time_stop = steady_clock::now();
+    auto duration = time_stop - global_time_start;
+    double time = duration_cast<nanoseconds>(duration).count() / 1e9;
+    cout << solution.get_score() << '/' << solution.J << ' ' << time << "s" << endl;
+    cout << "ACCUM TIME: " << accum_time << "s" << endl;
+    accum_time = 0;
 #endif
 
 #ifdef FAST_STREAM
-        solution.print();
+    solution.print();
 #endif
 
 #ifndef FAST_STREAM
