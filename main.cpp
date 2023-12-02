@@ -575,39 +575,6 @@ struct Solution {
                 });
             }
         }
-
-        /*for (int t = 0; t < T; t++) {
-            for (int n = 0; n < N; n++) {
-                vector<tuple<double, int, int>> kek;
-                kek.reserve(K * R);
-                for (int k = 0; k < K; k++) {
-                    for (int r = 0; r < R; r++) {
-                        kek.emplace_back(s0[t][n][k][r], k, r);
-                    }
-                }
-                sort(kek.begin(), kek.end(), greater<>());
-                while (kek.size() > K * R * 0.7) {
-                    kek.pop_back();
-                }
-                for (auto [weight, k, r]: kek) {
-                    used[t][n][k][r] = true;
-                }
-            }
-        }*/
-
-        /*for (int t = 0; t < T; t++) {
-            for (int n = 0; n < N; n++) {
-                auto &[best_k, best_r] = save_kr[t][n];
-                for (int k = 0; k < K; k++) {
-                    for (int r = 0; r < R; r++) {
-                        if (s0[t][n][k][r] > s0[t][n][best_k][best_r]) {
-                            best_k = k;
-                            best_r = r;
-                        }
-                    }
-                }
-            }
-        }*/
     }
 
     void print() {
@@ -1059,10 +1026,6 @@ struct Solution {
     }
 
     void deterministic_descent(int t, const vector<int> &js) {
-        double add_power_value = 1;
-
-        double remove_power_value = 0.3;
-
         relax_main_version(t);
 
         vector<bool> view(N);
@@ -1123,7 +1086,7 @@ struct Solution {
 
                     // add
                     {
-                        double add = calc_may_add_power(t, k, r, add_power_value);
+                        double add = calc_may_add_power(t, k, r, 1.0);
                         if (add != 0) {
                             change_power(t, n, k, r, +add);
                             double new_f = my_f();
@@ -1158,9 +1121,9 @@ struct Solution {
                     }
 
                     // sub
-                    {
-                        double sub = max(0.1, p[t][n][k][r] / 2);
-                        if (sub < p[t][n][k][r]) {
+                    if (p[t][n][k][r] != 0) {
+                        double sub = p[t][n][k][r] / 2;
+                        if(sub > 0.1) {
                             change_power(t, n, k, r, -sub);
                             double new_f = my_f();
                             change_power(t, n, k, r, +sub);
@@ -1254,13 +1217,11 @@ struct Solution {
             }
         }
 #ifndef FAST_STREAM
-        int min_count = 1e9;
+        int sum_count = 0;
         for (int t = 0; t < T; t++) {
-            if (!js[t].empty()) {
-                min_count = min(min_count, count_visited[t]);
-            }
+            sum_count += count_visited[t];
         }
-        cout << "min count visited: " << min_count << endl;
+        cout << "total count visited: " << sum_count << ' ' << sum_count * 1.0 / T << endl;
 #endif
     }
 
@@ -1398,29 +1359,29 @@ int main() {
         cout << "TEST CASE==============\n";
 #endif
 
-    global_time_start = steady_clock::now();
+        global_time_start = steady_clock::now();
 
 #ifdef FAST_STREAM
-    solution.read();
+        solution.read();
 #else
-    solution.read(input);
+        solution.read(input);
 #endif
 
-    solution.solve();
+        solution.solve();
 
 #ifndef FAST_STREAM
-    auto time_stop = steady_clock::now();
-    auto duration = time_stop - global_time_start;
-    double time = duration_cast<nanoseconds>(duration).count() / 1e9;
-    cout << solution.get_score() << '/' << solution.J << ' ' << time << "s"
-         << endl;
-    cout << "ACCUM TIME: " << accum_time << "s" << endl;
-    accum_time = 0;
+        auto time_stop = steady_clock::now();
+        auto duration = time_stop - global_time_start;
+        double time = duration_cast<nanoseconds>(duration).count() / 1e9;
+        cout << solution.get_score() << '/' << solution.J << ' ' << time << "s"
+             << endl;
+        cout << "ACCUM TIME: " << accum_time << "s" << endl;
+        accum_time = 0;
 #endif
 
 
 #ifdef FAST_STREAM
-    solution.print();
+        solution.print();
 #endif
 
 #ifndef FAST_STREAM
