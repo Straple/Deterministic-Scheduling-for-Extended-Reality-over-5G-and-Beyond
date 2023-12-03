@@ -1108,7 +1108,7 @@ struct Solution {
                 if (dont_touch[n]) {
                     continue;
                 }
-                for (int step = 0; step < 2; step++) {
+                for (int step = 0; step < 3; step++) {
                     int &i = save_kr_index[t][n];
                     auto [k, r] = permute_kr[t][n][i];
                     i++;
@@ -1189,14 +1189,16 @@ struct Solution {
 
         for (int step = 0; step < 20; step++) {
             do_step();
-            /*if (changes_stack[t].size() > 50) {
-                while (!changes_stack[t].empty()) {
-                    auto [n, k, r, change] = changes_stack[t].back();
-                    changes_stack[t].pop_back();
-                    change_power(t, n, k, r, -change);
-                }
-            }*/
         }
+
+        // возвращение к main
+        /*if (changes_stack[t].size() > 50) {
+            while (!changes_stack[t].empty()) {
+                auto [n, k, r, change] = changes_stack[t].back();
+                changes_stack[t].pop_back();
+                change_power(t, n, k, r, -change);
+            }
+        }*/
 
         if (changes_stack[t].size() > 20) {
             changes_stack[t].pop_back();
