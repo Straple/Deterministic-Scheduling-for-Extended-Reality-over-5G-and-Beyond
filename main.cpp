@@ -1108,7 +1108,7 @@ struct Solution {
                 if (dont_touch[n]) {
                     continue;
                 }
-                for (int step = 0; step < 3; step++) {
+                for (int step = 0; step < 4; step++) {
                     int &i = save_kr_index[t][n];
                     auto [k, r] = permute_kr[t][n][i];
                     i++;
