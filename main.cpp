@@ -299,20 +299,16 @@ bool is_spoiled(double num) {
 }
 
 bool high_equal(double x, double y) {
-    if (is_spoiled(x) || is_spoiled(y)) {
+    /*if (is_spoiled(x) || is_spoiled(y)) {
         exit(1);
-    }
-    if (y == 0) {
-        swap(x, y);
-    }
-    if (x == 0) {
-        return abs(y) < 1e-9;
+    }*/
+    if (x == 0 || y == 0) {
+        return abs(x - y) < 1e-9;
     }
     return abs(x - y) <= 1e-9 * max({abs(x), abs(y)});
 }
 
-
-//#define FAST_STREAM
+#define FAST_STREAM
 
 //#define PRINT_DEBUG_INFO
 
@@ -320,7 +316,7 @@ bool high_equal(double x, double y) {
 
 //#define VERIFY_DP
 
-#define DEBUG_MODE
+//#define DEBUG_MODE
 
 #ifdef DEBUG_MODE
 
@@ -379,10 +375,11 @@ constexpr uint32_t MAX_T = 1000;
 constexpr uint32_t MAX_R = 10;
 constexpr uint32_t MAX_J = 5000;
 
-mt19937 rnd(33);
+mt19937 gen(33);
+static std::uniform_int_distribution<> dis(0, 100);
 
 double get_rnd() {
-    return rnd() * 1.0 / UINT_MAX;
+    return dis(gen) / 100.0;
 }
 
 struct Solution {
@@ -468,6 +465,9 @@ struct Solution {
     vector<tuple<uint32_t, uint32_t, uint32_t, double>> changes_stack[MAX_T];
 
     vector<request_t> requests;
+
+    // nk_with_not_zero_p[t][r]
+    vector<pair<uint32_t, uint32_t>> nk_with_not_zero_p[MAX_T][MAX_R];
 
     void read(
 #ifndef FAST_STREAM
@@ -665,6 +665,8 @@ struct Solution {
             return;
         }
 
+        /// МЕРИЛ ВЕЗДЕ 5s
+
 #ifdef DEBUG_MODE
         if (high_equal(change, 0)) {
             cout << fixed << setprecision(50);
@@ -673,17 +675,15 @@ struct Solution {
         }
 #endif
 
-        for (uint32_t m: nms[t]) {
-            for (uint32_t k = 0; k < K; k++) {
-                if (p[t][r][m][k] > 0) {
-                    dp_prod_s[t][m][k] /= dp_s[t][r][m][k];
-                }
-            }
+        // 0.645924s -> 0.501693s -> 0.309104s
+        for (auto [m, k]: nk_with_not_zero_p[t][r]) {
+            dp_prod_s[t][m][k] /= dp_s[t][r][m][k];
         }
 
         ASSERT(!(p[t][r][n][k] != 0 && high_equal(p[t][r][n][k], 0)), ":_(");
         // ====================
 
+        // 0.168692s
         if (high_equal(p[t][r][n][k] + change, 0)) {
             change = -p[t][r][n][k];
             p[t][r][n][k] = 0;
@@ -696,6 +696,7 @@ struct Solution {
         ASSERT(!(p[t][r][n][k] != 0 && high_equal(p[t][r][n][k], 0)), ":_(");
         // ====================
 
+        // 0.515646s
         for (uint32_t m: nms[t]) {
             if (m != n) {
                 double x = change * s0_tkrn[t][k][r][m] / exp_d_2[n][k][r][m];
@@ -706,41 +707,49 @@ struct Solution {
 
         ASSERT((p[t][r][n][k] == change) == high_equal(p[t][r][n][k], change), "kek");
 
+        // 0.294296s -> 0.408725s -> 0.5231s
+
         // TODO: тут очень опасно делать сравнения по eps
         // можно получить неправильное обновление
         if (p[t][r][n][k] > 0 && p[t][r][n][k] == change) {
             // было ноль, стало не ноль
-            dp_count[t][n][k]++;
-            for (uint32_t m: nms[t]) {
-                if (n != m) {
-                    dp_exp_d_prod[t][r][k][m] *= exp_d_2[n][k][r][m];
-                }
+            auto &data = nk_with_not_zero_p[t][r];
+            data.emplace_back(n, k);
+            for (uint32_t i = data.size() - 1; i > 0 && data[i - 1] > data[i]; i--) {
+                swap(data[i - 1], data[i]);
             }
+
+            dp_count[t][n][k]++;
+
+            for (uint32_t m: nms[t]) {
+                dp_exp_d_prod[t][r][k][m] *= exp_d_2[n][k][r][m];
+            }
+            dp_exp_d_prod[t][r][k][n] /= exp_d_2[n][k][r][n];
         } else if (p[t][r][n][k] == 0) {
             // было не ноль, стало 0
+
+            auto &data = nk_with_not_zero_p[t][r];
+            data.erase(find(data.begin(), data.end(), make_pair(n, k)));
+
             dp_count[t][n][k]--;
+
             for (uint32_t m: nms[t]) {
-                if (n != m) {
-                    dp_exp_d_prod[t][r][k][m] /= exp_d_2[n][k][r][m];
-                }
+                dp_exp_d_prod[t][r][k][m] /= exp_d_2[n][k][r][m];
             }
+            dp_exp_d_prod[t][r][k][n] *= exp_d_2[n][k][r][n];
         }
 
-        for (uint32_t k = 0; k < K; k++) {
-            for (uint32_t m: nms[t]) {
-                dp_s[t][r][m][k] = p[t][r][m][k] * s0[t][r][k][m] /
-                                   (dp_denom_sum[t][r][k][m] +
-                                    dp_denom_sum_global_add[t][r][m]) *
-                                   dp_exp_d_prod[t][r][k][m];
-            }
+        //0.944143s -> 0.502808s -> 0.396134s
+        for (auto [m, k]: nk_with_not_zero_p[t][r]) {
+            dp_s[t][r][m][k] = p[t][r][m][k] * s0[t][r][k][m] /
+                               (dp_denom_sum[t][r][k][m] +
+                                dp_denom_sum_global_add[t][r][m]) *
+                               dp_exp_d_prod[t][r][k][m];
         }
 
-        for (uint32_t m: nms[t]) {
-            for (uint32_t k = 0; k < K; k++) {
-                if (p[t][r][m][k] > 0) {
-                    dp_prod_s[t][m][k] *= dp_s[t][r][m][k];
-                }
-            }
+        // 0.54641s -> 0.379976s -> 0.259082s
+        for (auto [m, k]: nk_with_not_zero_p[t][r]) {
+            dp_prod_s[t][m][k] *= dp_s[t][r][m][k];
         }
     }
 
@@ -836,7 +845,14 @@ struct Solution {
     }
 
     double calc_value_in_Q(uint32_t t) {
-        return count_visited[t] + 10 * main_best_f[t] / 1e6 / max(1U, (uint32_t) js[t].size());
+        uint32_t count_accepted = 0;
+        for (uint32_t j: js[t]) {
+            auto [TBS, n, t0, t1] = requests[j];
+            count_accepted += main_total_g[j] > TBS;
+        }
+        return (count_accepted == js[t].size()) * 1000 +
+               count_visited[t] +
+               10 * main_best_f[t] / 1e6 / (js[t].size() + 1);
     }
 
     bool relax_main_version(uint32_t t) {
@@ -989,7 +1005,7 @@ struct Solution {
 
                     // add
                     {
-                        double add = calc_may_add_power(t, k, r, 1.1);
+                        double add = calc_may_add_power(t, k, r, 1.0);
                         if (add != 0) {
                             change_power(t, n, k, r, +add);
                             update_add_g(t);
@@ -1025,7 +1041,7 @@ struct Solution {
 
                     // sub
                     if (p[t][r][n][k] != 0) {
-                        double sub = p[t][r][n][k] / 2;
+                        double sub = p[t][r][n][k] * 0.5;
                         if (sub > 0.1) {
                             change_power(t, n, k, r, -sub);
                             update_add_g(t);
@@ -1056,7 +1072,9 @@ struct Solution {
             }
         };
 
-        for (uint32_t step = 0; step < 20; step++) {
+        const uint32_t steps_count = 25 - min(15U, count_visited[t]);
+
+        for (uint32_t step = 0; step < steps_count; step++) {
             do_step();
         }
 
@@ -1319,30 +1337,28 @@ int main() {
         cout << "TEST CASE==============\n";
 #endif
 
-        global_time_start = steady_clock::now();
-        global_time_finish = global_time_start + nanoseconds(1'900'000'000ULL);
+    global_time_start = steady_clock::now();
+    global_time_finish = global_time_start + nanoseconds(1'900'000'000ULL);
 
 #ifdef FAST_STREAM
-        solution.read();
+    solution.read();
 #else
-        solution.read(input);
+    solution.read(input);
 #endif
 
-        solution.solve();
+    solution.solve();
 
 #ifndef FAST_STREAM
-        auto time_stop = steady_clock::now();
-        auto duration = time_stop - global_time_start;
-        double time = duration_cast<nanoseconds>(duration).count() / 1e9;
-        cout << solution.get_score() << '/' << solution.J << ' ' << time << "s"
-             << endl;
-        cout << "ACCUM TIME: " << accum_time << "s" << endl;
-        accum_time = 0;
+    auto time_stop = steady_clock::now();
+    auto duration = time_stop - global_time_start;
+    double time = duration_cast<nanoseconds>(duration).count() / 1e9;
+    cout << solution.get_score() << '/' << solution.J << ' ' << time << "s" << endl;
+    cout << "ACCUM TIME: " << accum_time << "s" << endl;
+    accum_time = 0;
 #endif
 
-
 #ifdef FAST_STREAM
-        solution.print();
+    solution.print();
 #endif
 
 #ifndef FAST_STREAM
