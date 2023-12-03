@@ -411,8 +411,8 @@ struct Solution {
 
     vector<request_t> requests;
 
-    // p[t][n][k][r]
-    double p[MAX_T][MAX_N][MAX_K][MAX_R];
+    // p[t][r][n][k]
+    double p[MAX_T][MAX_R][MAX_N][MAX_K];
 
     double main_p[MAX_T][MAX_N][MAX_K][MAX_R];
 
@@ -628,7 +628,7 @@ struct Solution {
         for (int n = 0; n < N; n++) {
             for (int k = 0; k < K; k++) {
                 for (int r = 0; r < R; r++) {
-                    sum[k] += p[t][n][k][r];
+                    sum[k] += p[t][r][n][k];
                 }
             }
         }
@@ -641,7 +641,7 @@ struct Solution {
             for (int r = 0; r < R; r++) {
                 double sum = 0;
                 for (int n = 0; n < N; n++) {
-                    sum += p[t][n][k][r];
+                    sum += p[t][r][n][k];
                 }
                 if (sum > 4 + 1e-9) {
                     return false;
@@ -655,13 +655,13 @@ struct Solution {
         double sum = 0;
         for (int k = 0; k < K; k++) {
             for (int r = 0; r < R; r++) {
-                sum += p[t][n][k][r];
+                sum += p[t][r][n][k];
             }
         }
         return sum;
     }
 
-    // p[t][n][k][r] += change
+    // p[t][r][n][k] += change
     // with update dp for fast_f
     void change_power(int t, int n, int k, int r, double change) {
         // TODO: порядок очень важен
@@ -681,27 +681,25 @@ struct Solution {
 
         for (int m: nms[t]) {
             for (int k = 0; k < K; k++) {
-                if (p[t][m][k][r] > 0) {
+                if (p[t][r][m][k] > 0) {
                     dp_prod_s[t][m][k] /= dp_s[t][r][m][k];
                 }
             }
         }
 
-        ASSERT(!(p[t][n][k][r] != 0 && high_equal(p[t][n][k][r], 0)), ":_(");
+        ASSERT(!(p[t][r][n][k] != 0 && high_equal(p[t][r][n][k], 0)), ":_(");
         // ====================
 
-        if (high_equal(p[t][n][k][r] + change, 0)) {
-            change = -p[t][n][k][r];
-            p[t][n][k][r] = 0;
+        if (high_equal(p[t][r][n][k] + change, 0)) {
+            change = -p[t][r][n][k];
+            p[t][r][n][k] = 0;
         } else {
-            p[t][n][k][r] += change;
+            p[t][r][n][k] += change;
         }
         dp_power_sum[t][k][r] += change;
         dp_power_sum2[t][k] += change;
 
-        //double new_p = p[t][n][k][r];
-
-        ASSERT(!(p[t][n][k][r] != 0 && high_equal(p[t][n][k][r], 0)), ":_(");
+        ASSERT(!(p[t][r][n][k] != 0 && high_equal(p[t][r][n][k], 0)), ":_(");
         // ====================
 
         for (int m: nms[t]) {
@@ -712,11 +710,11 @@ struct Solution {
             }
         }
 
-        ASSERT((p[t][n][k][r] == change) == high_equal(p[t][n][k][r], change), "kek");
+        ASSERT((p[t][r][n][k] == change) == high_equal(p[t][r][n][k], change), "kek");
 
         // TODO: тут очень опасно делать сравнения по eps
         // можно получить неправильное обновление
-        if (p[t][n][k][r] > 0 && p[t][n][k][r] == change) {
+        if (p[t][r][n][k] > 0 && p[t][r][n][k] == change) {
             // было ноль, стало не ноль
             dp_count[t][n][k]++;
             for (int m: nms[t]) {
@@ -724,7 +722,7 @@ struct Solution {
                     dp_exp_d_prod[t][r][m][k] *= exp_d_2[n][k][r][m];
                 }
             }
-        } else if (p[t][n][k][r] == 0) {
+        } else if (p[t][r][n][k] == 0) {
             // было не ноль, стало 0
             dp_count[t][n][k]--;
             for (int m: nms[t]) {
@@ -736,7 +734,7 @@ struct Solution {
 
         for (int m: nms[t]) {
             for (int k = 0; k < K; k++) {
-                dp_s[t][r][m][k] = p[t][m][k][r] * s0[t][m][k][r] /
+                dp_s[t][r][m][k] = p[t][r][m][k] * s0[t][m][k][r] /
                                    (dp_denom_sum[t][r][m][k] +
                                     dp_denom_sum_global_add[t][r][m]) *
                                    dp_exp_d_prod[t][r][m][k];
@@ -745,7 +743,7 @@ struct Solution {
 
         for (int m: nms[t]) {
             for (int k = 0; k < K; k++) {
-                if (p[t][m][k][r] > 0) {
+                if (p[t][r][m][k] > 0) {
                     dp_prod_s[t][m][k] *= dp_s[t][r][m][k];
                 }
             }
@@ -818,7 +816,7 @@ struct Solution {
 #ifdef DEBUG_MODE
             double sum = 0;
             for (int n: nms[t]) {
-                sum += p[t][n][k][r];
+                sum += p[t][r][n][k];
             }
             ASSERT(high_equal(dp_power_sum[t][k][r], sum), "kek");
             ASSERT(sum <= 4 + 1e-9, "fatal");
@@ -866,7 +864,7 @@ struct Solution {
             for (int n = 0; n < N; n++) {
                 for (int k = 0; k < K; k++) {
                     for (int r = 0; r < R; r++) {
-                        main_p[t][n][k][r] = p[t][n][k][r];
+                        main_p[t][n][k][r] = p[t][r][n][k];
                     }
                 }
             }
@@ -901,7 +899,7 @@ struct Solution {
             for (int n = 0; n < N; n++) {
                 for (int k = 0; k < K; k++) {
                     for (int r = 0; r < R; r++) {
-                        swap(p[t][n][k][r], main_p[t][n][k][r]);
+                        swap(p[t][r][n][k], main_p[t][n][k][r]);
                     }
                 }
             }
@@ -924,7 +922,7 @@ struct Solution {
             for (int n = 0; n < N; n++) {
                 for (int k = 0; k < K; k++) {
                     for (int r = 0; r < R; r++) {
-                        swap(p[t][n][k][r], main_p[t][n][k][r]);
+                        swap(p[t][r][n][k], main_p[t][n][k][r]);
                     }
                 }
             }
@@ -1009,8 +1007,8 @@ struct Solution {
                     }
 
                     // set zero
-                    if (p[t][n][k][r] != 0) {
-                        double x = p[t][n][k][r];
+                    if (p[t][r][n][k] != 0) {
+                        double x = p[t][r][n][k];
                         change_power(t, n, k, r, -x);
                         update_add_g(t);
                         double new_f = my_f();
@@ -1026,8 +1024,8 @@ struct Solution {
                     }
 
                     // sub
-                    if (p[t][n][k][r] != 0) {
-                        double sub = p[t][n][k][r] / 2;
+                    if (p[t][r][n][k] != 0) {
+                        double sub = p[t][r][n][k] / 2;
                         if (sub > 0.1) {
                             change_power(t, n, k, r, -sub);
                             update_add_g(t);
@@ -1090,8 +1088,8 @@ struct Solution {
 
                 for (int k = 0; k < K; k++) {
                     for (int r = 0; r < R; r++) {
-                        if (p[t][n][k][r] != 0) {
-                            change_power(t, n, k, r, -p[t][n][k][r]);
+                        if (p[t][r][n][k] != 0) {
+                            change_power(t, n, k, r, -p[t][r][n][k]);
                             update_add_g(t);
                             relax_main_version(t);
                         }
@@ -1153,8 +1151,6 @@ struct Solution {
                         break;
                     }
                 }
-                //best_time = Q.begin()->second;
-                //Q.erase(Q.begin());
             }
 
             if (best_time == -1) {
@@ -1203,7 +1199,7 @@ struct Solution {
                 for (int k = 0; k < K; k++) {
                     for (int r = 0; r < R; r++) {
                         power_sum += main_p[t][n][k][r];
-                        p[t][n][k][r] = main_p[t][n][k][r];
+                        p[t][r][n][k] = main_p[t][n][k][r];
                     }
                 }
             }
@@ -1234,7 +1230,7 @@ struct Solution {
                 if (m != n) {
                     for (int k = 0; k < K; k++) {
                         for (int r = 0; r < R; r++) {
-                            dp_sum[k][r] += s0[t][n][k][r] * p[t][m][k][r] /
+                            dp_sum[k][r] += s0[t][n][k][r] * p[t][r][m][k] /
                                             exp_d[n][m][k][r];
                         }
                     }
@@ -1260,15 +1256,15 @@ struct Solution {
             double accum_prod = 1;
             int count = 0;
             for (int r = 0; r < R; r++) {
-                if (p[t][n][k][r] > 0) {
+                if (p[t][r][n][k] > 0) {
                     count++;
-                    accum_prod *= p[t][n][k][r];
+                    accum_prod *= p[t][r][n][k];
                     accum_prod *= s0[t][n][k][r];
                     accum_prod /= dp_s0_p_d[k][r];
 
                     for (int m = 0; m < N; m++) {
                         if (n != m) {
-                            if (p[t][m][k][r] > 0) {
+                            if (p[t][r][m][k] > 0) {
                                 accum_prod *= exp_d_2[n][k][r][m];
                             }
                         }
@@ -1292,9 +1288,9 @@ struct Solution {
             double accum_prod = 1;
             int count = 0;
             for (int r = 0; r < R; r++) {
-                if (p[t][n][k][r] > 0) {
+                if (p[t][r][n][k] > 0) {
                     count++;
-                    accum_prod *= p[t][n][k][r];
+                    accum_prod *= p[t][r][n][k];
                     accum_prod *= s0[t][n][k][r];
                 }
             }
@@ -1330,30 +1326,30 @@ int main() {
         cout << "TEST CASE==============\n";
 #endif
 
-        global_time_start = steady_clock::now();
-        global_time_finish = global_time_start + nanoseconds(1'900 * 1'000'000);
+    global_time_start = steady_clock::now();
+    global_time_finish = global_time_start + nanoseconds(1'900'000'000ULL);
 
 #ifdef FAST_STREAM
-        solution.read();
+    solution.read();
 #else
-        solution.read(input);
+    solution.read(input);
 #endif
 
-        solution.solve();
+    solution.solve();
 
 #ifndef FAST_STREAM
-        auto time_stop = steady_clock::now();
-        auto duration = time_stop - global_time_start;
-        double time = duration_cast<nanoseconds>(duration).count() / 1e9;
-        cout << solution.get_score() << '/' << solution.J << ' ' << time << "s"
-             << endl;
-        cout << "ACCUM TIME: " << accum_time << "s" << endl;
-        accum_time = 0;
+    auto time_stop = steady_clock::now();
+    auto duration = time_stop - global_time_start;
+    double time = duration_cast<nanoseconds>(duration).count() / 1e9;
+    cout << solution.get_score() << '/' << solution.J << ' ' << time << "s"
+         << endl;
+    cout << "ACCUM TIME: " << accum_time << "s" << endl;
+    accum_time = 0;
 #endif
 
 
 #ifdef FAST_STREAM
-        solution.print();
+    solution.print();
 #endif
 
 #ifndef FAST_STREAM
