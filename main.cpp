@@ -311,7 +311,8 @@ bool high_equal(double x, double y) {
     return abs(x - y) <= 1e-9 * max({abs(x), abs(y)});
 }
 
-#define FAST_STREAM
+
+//#define FAST_STREAM
 
 //#define PRINT_DEBUG_INFO
 
@@ -319,7 +320,7 @@ bool high_equal(double x, double y) {
 
 //#define VERIFY_DP
 
-//#define DEBUG_MODE
+#define DEBUG_MODE
 
 #ifdef DEBUG_MODE
 
@@ -367,9 +368,9 @@ void my_time_end() {
 
 struct request_t {
     double TBS;
-    int n;
-    int t0;
-    int t1;
+    uint32_t n;
+    uint32_t t0;
+    uint32_t t1;
 };
 
 constexpr uint32_t MAX_N = 100;
@@ -385,16 +386,16 @@ double get_rnd() {
 }
 
 struct Solution {
-    int N;
-    int K;
-    int T;
-    int R;
-    int J;
+    uint32_t N;
+    uint32_t K;
+    uint32_t T;
+    uint32_t R;
+    uint32_t J;
 
-    // s0[t][n][k][r]
-    double s0[MAX_T][MAX_N][MAX_K][MAX_R];
+    // s0[t][r][k][n]
+    double s0[MAX_T][MAX_R][MAX_K][MAX_N];
 
-    // s0[t][k][r][n]
+    // s0_tkrn[t][k][r][n]
     double s0_tkrn[MAX_T][MAX_K][MAX_R][MAX_N];
 
     // d[n][m][k][r]
@@ -433,7 +434,7 @@ struct Solution {
     double dp_prod_s[MAX_T][MAX_N][MAX_K];
 
     // dp_count[t][n][k]
-    int dp_count[MAX_T][MAX_N][MAX_K];
+    uint32_t dp_count[MAX_T][MAX_N][MAX_K];
 
     // dp_denom_sum[t][r][k][n]
     double dp_denom_sum[MAX_T][MAX_R][MAX_K][MAX_N];
@@ -448,23 +449,23 @@ struct Solution {
     double dp_power_sum2[MAX_T][MAX_K];
 
     // js[t]
-    vector<int> js[MAX_T];
+    vector<uint32_t> js[MAX_T];
 
-    vector<int> nms[MAX_T];
+    vector<uint32_t> nms[MAX_T];
 
     // save_kr[t][n] = (k, r)
-    int save_kr_index[MAX_T][MAX_N];
+    uint32_t save_kr_index[MAX_T][MAX_N];
 
     // permute_kr[t][n]
-    vector<pair<int, int>> permute_kr[MAX_T][MAX_N];
+    vector<pair<uint32_t, uint32_t>> permute_kr[MAX_T][MAX_N];
 
-    int count_visited[MAX_T];
+    uint32_t count_visited[MAX_T];
 
-    set<pair<double, int>> Q;
+    set<pair<double, uint32_t>> Q;
     double value_in_Q[MAX_T];
 
     // changes_stack[t] = { (n, k, r, change) }
-    vector<tuple<int, int, int, double>> changes_stack[MAX_T];
+    vector<tuple<uint32_t, uint32_t, uint32_t, double>> changes_stack[MAX_T];
 
     vector<request_t> requests;
 
@@ -482,25 +483,25 @@ struct Solution {
 #else
         input >> N >> K >> T >> R;
 #endif
-        for (int t = 0; t < T; t++) {
-            for (int k = 0; k < K; k++) {
-                for (int r = 0; r < R; r++) {
-                    for (int n = 0; n < N; n++) {
+        for (uint32_t t = 0; t < T; t++) {
+            for (uint32_t k = 0; k < K; k++) {
+                for (uint32_t r = 0; r < R; r++) {
+                    for (uint32_t n = 0; n < N; n++) {
 #ifdef FAST_STREAM
-                        s0[t][n][k][r] = readDouble();
+                        s0[t][r][k][n] = readDouble();
 #else
-                        input >> s0[t][n][k][r];
+                        input >> s0[t][r][k][n];
 #endif
-                        s0_tkrn[t][k][r][n] = s0[t][n][k][r];
+                        s0_tkrn[t][k][r][n] = s0[t][r][k][n];
                     }
                 }
             }
         }
 
-        for (int k = 0; k < K; k++) {
-            for (int r = 0; r < R; r++) {
-                for (int m = 0; m < N; m++) {
-                    for (int n = 0; n < N; n++) {
+        for (uint32_t k = 0; k < K; k++) {
+            for (uint32_t r = 0; r < R; r++) {
+                for (uint32_t m = 0; m < N; m++) {
+                    for (uint32_t n = 0; n < N; n++) {
 #ifdef FAST_STREAM
                         d[n][m][k][r] = readDouble();
 #else
@@ -520,9 +521,9 @@ struct Solution {
 #endif
 
         requests.assign(J, {});
-        for (int i = 0; i < J; i++) {
-            int j;
-            int t0, td;
+        for (uint32_t i = 0; i < J; i++) {
+            uint32_t j;
+            uint32_t t0, td;
 
 #ifdef FAST_STREAM
             j = readInt();
@@ -537,24 +538,24 @@ struct Solution {
             input >> t0 >> td;
 #endif
             requests[j].TBS += 1e-9;
-            int t1 = t0 + td - 1;
+            uint32_t t1 = t0 + td - 1;
 
             requests[j].t0 = t0;
             requests[j].t1 = t1;
         }
 
-        for (int t = 0; t < T; t++) {
-            for (int n = 0; n < N; n++) {
-                for (int k = 0; k < K; k++) {
+        for (uint32_t t = 0; t < T; t++) {
+            for (uint32_t n = 0; n < N; n++) {
+                for (uint32_t k = 0; k < K; k++) {
                     dp_prod_s[t][n][k] = 1;
                 }
             }
         }
 
-        for (int t = 0; t < T; t++) {
-            for (int r = 0; r < R; r++) {
-                for (int k = 0; k < K; k++) {
-                    for (int n = 0; n < N; n++) {
+        for (uint32_t t = 0; t < T; t++) {
+            for (uint32_t r = 0; r < R; r++) {
+                for (uint32_t k = 0; k < K; k++) {
+                    for (uint32_t n = 0; n < N; n++) {
                         dp_exp_d_prod[t][r][k][n] = 1;
                         dp_denom_sum[t][r][k][n] = 1;
                     }
@@ -562,32 +563,32 @@ struct Solution {
             }
         }
 
-        for (int j = 0; j < J; j++) {
+        for (uint32_t j = 0; j < J; j++) {
             auto [TBS, n, t0, t1] = requests[j];
-            for (int t = t0; t <= t1; t++) {
+            for (uint32_t t = t0; t <= t1; t++) {
                 js[t].push_back(j);
                 nms[t].push_back(n);
             }
         }
-        for (int t = 0; t < T; t++) {
+        for (uint32_t t = 0; t < T; t++) {
             sort(nms[t].begin(), nms[t].end());
         }
 
-        for (int t = 0; t < T; t++) {
+        for (uint32_t t = 0; t < T; t++) {
             main_best_f[t] = -1e300;
         }
 
-        for (int t = 0; t < T; t++) {
-            for (int n = 0; n < N; n++) {
+        for (uint32_t t = 0; t < T; t++) {
+            for (uint32_t n = 0; n < N; n++) {
                 permute_kr[t][n].reserve(K * R);
-                for (int k = 0; k < K; k++) {
-                    for (int r = 0; r < R; r++) {
+                for (uint32_t k = 0; k < K; k++) {
+                    for (uint32_t r = 0; r < R; r++) {
                         permute_kr[t][n].emplace_back(k, r);
                     }
                 }
 
                 sort(permute_kr[t][n].begin(), permute_kr[t][n].end(), [&](const auto &lhs, const auto &rhs) {
-                    return s0[t][n][lhs.first][lhs.second] > s0[t][n][rhs.first][rhs.second];
+                    return s0[t][lhs.second][lhs.first][n] > s0[t][rhs.second][rhs.first][n];
                 });
             }
         }
@@ -595,10 +596,10 @@ struct Solution {
 
     void print() {
         //ofstream cout("output.txt");
-        for (int t = 0; t < T; t++) {
-            for (int k = 0; k < K; k++) {
-                for (int r = 0; r < R; r++) {
-                    for (int n = 0; n < N; n++) {
+        for (uint32_t t = 0; t < T; t++) {
+            for (uint32_t k = 0; k < K; k++) {
+                for (uint32_t r = 0; r < R; r++) {
+                    for (uint32_t n = 0; n < N; n++) {
 #ifdef FAST_STREAM
                         writeDouble(main_p[t][r][n][k]);
                         writeChar(' ');
@@ -616,24 +617,24 @@ struct Solution {
         }
     }
 
-    bool verify_power(int t) {
+    bool verify_power(uint32_t t) {
         vector<double> sum(K);
-        for (int n = 0; n < N; n++) {
-            for (int k = 0; k < K; k++) {
-                for (int r = 0; r < R; r++) {
+        for (uint32_t n = 0; n < N; n++) {
+            for (uint32_t k = 0; k < K; k++) {
+                for (uint32_t r = 0; r < R; r++) {
                     sum[k] += p[t][r][n][k];
                 }
             }
         }
-        for (int k = 0; k < K; k++) {
+        for (uint32_t k = 0; k < K; k++) {
             if (sum[k] > R + 1e-9) {
                 return false;
             }
         }
-        for (int k = 0; k < K; k++) {
-            for (int r = 0; r < R; r++) {
+        for (uint32_t k = 0; k < K; k++) {
+            for (uint32_t r = 0; r < R; r++) {
                 double sum = 0;
-                for (int n = 0; n < N; n++) {
+                for (uint32_t n = 0; n < N; n++) {
                     sum += p[t][r][n][k];
                 }
                 if (sum > 4 + 1e-9) {
@@ -644,10 +645,10 @@ struct Solution {
         return true;
     }
 
-    double sum_power(int t, int n) {
+    double sum_power(uint32_t t, uint32_t n) {
         double sum = 0;
-        for (int k = 0; k < K; k++) {
-            for (int r = 0; r < R; r++) {
+        for (uint32_t k = 0; k < K; k++) {
+            for (uint32_t r = 0; r < R; r++) {
                 sum += p[t][r][n][k];
             }
         }
@@ -656,7 +657,7 @@ struct Solution {
 
     // p[t][r][n][k] += change
     // with update dp for fast_f
-    void change_power(int t, int n, int k, int r, double change) {
+    void change_power(uint32_t t, uint32_t n, uint32_t k, uint32_t r, double change) {
         // TODO: порядок очень важен
 
         // TODO: ОЧЕНЬ ВАЖНО
@@ -672,8 +673,8 @@ struct Solution {
         }
 #endif
 
-        for (int m: nms[t]) {
-            for (int k = 0; k < K; k++) {
+        for (uint32_t m: nms[t]) {
+            for (uint32_t k = 0; k < K; k++) {
                 if (p[t][r][m][k] > 0) {
                     dp_prod_s[t][m][k] /= dp_s[t][r][m][k];
                 }
@@ -695,7 +696,7 @@ struct Solution {
         ASSERT(!(p[t][r][n][k] != 0 && high_equal(p[t][r][n][k], 0)), ":_(");
         // ====================
 
-        for (int m: nms[t]) {
+        for (uint32_t m: nms[t]) {
             if (m != n) {
                 double x = change * s0_tkrn[t][k][r][m] / exp_d_2[n][k][r][m];
                 dp_denom_sum_global_add[t][r][m] += x;
@@ -710,7 +711,7 @@ struct Solution {
         if (p[t][r][n][k] > 0 && p[t][r][n][k] == change) {
             // было ноль, стало не ноль
             dp_count[t][n][k]++;
-            for (int m: nms[t]) {
+            for (uint32_t m: nms[t]) {
                 if (n != m) {
                     dp_exp_d_prod[t][r][k][m] *= exp_d_2[n][k][r][m];
                 }
@@ -718,24 +719,24 @@ struct Solution {
         } else if (p[t][r][n][k] == 0) {
             // было не ноль, стало 0
             dp_count[t][n][k]--;
-            for (int m: nms[t]) {
+            for (uint32_t m: nms[t]) {
                 if (n != m) {
                     dp_exp_d_prod[t][r][k][m] /= exp_d_2[n][k][r][m];
                 }
             }
         }
 
-        for (int k = 0; k < K; k++) {
-            for (int m: nms[t]) {
-                dp_s[t][r][m][k] = p[t][r][m][k] * s0[t][m][k][r] /
+        for (uint32_t k = 0; k < K; k++) {
+            for (uint32_t m: nms[t]) {
+                dp_s[t][r][m][k] = p[t][r][m][k] * s0[t][r][k][m] /
                                    (dp_denom_sum[t][r][k][m] +
                                     dp_denom_sum_global_add[t][r][m]) *
                                    dp_exp_d_prod[t][r][k][m];
             }
         }
 
-        for (int m: nms[t]) {
-            for (int k = 0; k < K; k++) {
+        for (uint32_t m: nms[t]) {
+            for (uint32_t k = 0; k < K; k++) {
                 if (p[t][r][m][k] > 0) {
                     dp_prod_s[t][m][k] *= dp_s[t][r][m][k];
                 }
@@ -743,9 +744,9 @@ struct Solution {
         }
     }
 
-    double correct_f(int t) {
+    double correct_f(uint32_t t) {
         double result = 0;
-        for (int j: js[t]) {
+        for (uint32_t j: js[t]) {
             auto [TBS, n, t0, t1] = requests[j];
             double g = get_g(t, n);
             double x = 0;
@@ -759,9 +760,9 @@ struct Solution {
         return result;
     }
 
-    void update_add_g(int t, int n) {
+    void update_add_g(uint32_t t, uint32_t n) {
         double sum = 0;
-        for (int k = 0; k < K; k++) {
+        for (uint32_t k = 0; k < K; k++) {
             if (dp_count[t][n][k] != 0) {
                 ASSERT(dp_prod_s[t][n][k] > 0, "what?");
                 sum += dp_count[t][n][k] * log2(1 + pow(dp_prod_s[t][n][k], 1.0 / dp_count[t][n][k]));
@@ -771,16 +772,16 @@ struct Solution {
         add_g[t][n] = 192 * sum;
     }
 
-    void update_add_g(int t) {
-        for (int j: js[t]) {
+    void update_add_g(uint32_t t) {
+        for (uint32_t j: js[t]) {
             auto [TBS, n, t0, t1] = requests[j];
             update_add_g(t, n);
         }
     }
 
-    double fast_f(int t) {
+    double fast_f(uint32_t t) {
         double result = 0;
-        for (int j: js[t]) {
+        for (uint32_t j: js[t]) {
             auto [TBS, n, t0, t1] = requests[j];
             double x = 0;
             // TODO: улучшить эту метрику
@@ -804,11 +805,11 @@ struct Solution {
         return result;
     }
 
-    double calc_may_add_power(int t, int k, int r, double add) {
+    double calc_may_add_power(uint32_t t, uint32_t k, uint32_t r, double add) {
         {
 #ifdef DEBUG_MODE
             double sum = 0;
-            for (int n: nms[t]) {
+            for (uint32_t n: nms[t]) {
                 sum += p[t][r][n][k];
             }
             ASSERT(high_equal(dp_power_sum[t][k][r], sum), "kek");
@@ -820,7 +821,7 @@ struct Solution {
         {
 #ifdef DEBUG_MODE
             double sum = 0;
-            for (int r = 0; r < R; r++) {
+            for (uint32_t r = 0; r < R; r++) {
                 sum += dp_power_sum[t][k][r];
             }
             ASSERT(high_equal(sum, dp_power_sum2[t][k]), "kek");
@@ -834,11 +835,11 @@ struct Solution {
         return add;
     }
 
-    double calc_value_in_Q(int t) {
-        return count_visited[t] + 10 * main_best_f[t] / 1e6 / max(1, (int) js[t].size());
+    double calc_value_in_Q(uint32_t t) {
+        return count_visited[t] + 10 * main_best_f[t] / 1e6 / max(1U, (uint32_t) js[t].size());
     }
 
-    bool relax_main_version(int t) {
+    bool relax_main_version(uint32_t t) {
         double f = fast_f(t);
         bool relaxed = false;
         if (f > main_best_f[t]) {
@@ -846,27 +847,33 @@ struct Solution {
             main_best_f[t] = f;
 
             // update g
-            for (int j: js[t]) {
-                int n = requests[j].n;
+            for (uint32_t j: js[t]) {
+                uint32_t n = requests[j].n;
                 main_total_g[j] -= main_add_g[t][n];
                 main_add_g[t][n] = add_g[t][n];
                 main_total_g[j] += main_add_g[t][n];
             }
 
             // copy power
-            for (int n = 0; n < N; n++) {
-                for (int k = 0; k < K; k++) {
-                    for (int r = 0; r < R; r++) {
+            for (uint32_t n = 0; n < N; n++) {
+                for (uint32_t k = 0; k < K; k++) {
+                    for (uint32_t r = 0; r < R; r++) {
                         main_p[t][r][n][k] = p[t][r][n][k];
                     }
                 }
             }
 
             // relax main_best_f
-            for (int time = max(0, t - 100); time < min(T, t + 100); time++) {
+            uint32_t left_time = 0;
+            if (t > 100) {
+                left_time -= 100;
+            }
+            uint32_t right_time = min(T, t + 100);
+
+            for (uint32_t time = left_time; time < right_time; time++) {
                 if (time != t) {
                     main_best_f[time] = 0;
-                    for (int j: js[time]) {
+                    for (uint32_t j: js[time]) {
                         auto [TBS, n, t0, t1] = requests[j];
                         double x = 0;
                         if (main_total_g[j] > TBS) {
@@ -888,33 +895,33 @@ struct Solution {
         }
 
 #ifdef DEBUG_MODE
-        for (int t = 0; t < T; t++) {
-            for (int n = 0; n < N; n++) {
-                for (int k = 0; k < K; k++) {
-                    for (int r = 0; r < R; r++) {
+        for (uint32_t t = 0; t < T; t++) {
+            for (uint32_t n = 0; n < N; n++) {
+                for (uint32_t k = 0; k < K; k++) {
+                    for (uint32_t r = 0; r < R; r++) {
                         swap(p[t][r][n][k], main_p[t][r][n][k]);
                     }
                 }
             }
         }
-        for (int t = 0; t < T; t++) {
+        for (uint32_t t = 0; t < T; t++) {
             ASSERT(main_best_f[t] < -1e200 || high_equal(main_best_f[t], correct_f(t)), "kek");
         }
 
-        for (int j = 0; j < J; j++) {
+        for (uint32_t j = 0; j < J; j++) {
             auto [TBS, n, t0, t1] = requests[j];
             double g = 0;
-            for (int t = t0; t <= t1; t++) {
+            for (uint32_t t = t0; t <= t1; t++) {
                 g += get_g(t, n);
                 ASSERT(high_equal(main_add_g[t][n], get_g(t, n)), "kek");
             }
             ASSERT(high_equal(g, main_total_g[j]), "kek");
         }
 
-        for (int t = 0; t < T; t++) {
-            for (int n = 0; n < N; n++) {
-                for (int k = 0; k < K; k++) {
-                    for (int r = 0; r < R; r++) {
+        for (uint32_t t = 0; t < T; t++) {
+            for (uint32_t n = 0; n < N; n++) {
+                for (uint32_t k = 0; k < K; k++) {
+                    for (uint32_t r = 0; r < R; r++) {
                         swap(p[t][r][n][k], main_p[t][r][n][k]);
                     }
                 }
@@ -924,7 +931,7 @@ struct Solution {
         return relaxed;
     }
 
-    void deterministic_descent(int t) {
+    void deterministic_descent(uint32_t t) {
         update_add_g(t);
         if (relax_main_version(t)) {
             changes_stack[t].clear();
@@ -933,7 +940,7 @@ struct Solution {
         vector<bool> view(N);
         vector<bool> dont_touch(N);
 
-        for (int j: js[t]) {
+        for (uint32_t j: js[t]) {
             auto [TBS, n, t0, t1] = requests[j];
             if (add_g[t][n] + main_total_g[j] - main_add_g[t][n] <= TBS) {
                 view[n] = true;
@@ -945,7 +952,7 @@ struct Solution {
 
         auto my_f = [&]() {
             double result = 0;
-            for (int j: js[t]) {
+            for (uint32_t j: js[t]) {
                 auto [TBS, n, t0, t1] = requests[j];
                 if (view[n]) {
                     double x = 0;
@@ -963,17 +970,17 @@ struct Solution {
 
         auto do_step = [&]() {  // NOLINT
             double best_f = -1e300;
-            int best_n = -1;
-            int best_k = -1;
-            int best_r = -1;
+            uint32_t best_n = -1;
+            uint32_t best_k = -1;
+            uint32_t best_r = -1;
             double best_add = 0;
 
-            for (int n: nms[t]) {
+            for (uint32_t n: nms[t]) {
                 if (dont_touch[n]) {
                     continue;
                 }
-                int &i = save_kr_index[t][n];
-                for (int step = 0; step < 4; step++) {
+                uint32_t &i = save_kr_index[t][n];
+                for (uint32_t step = 0; step < 4; step++) {
                     auto [k, r] = permute_kr[t][n][i];
                     i++;
                     if (i == permute_kr[t][n].size()) {
@@ -1049,7 +1056,7 @@ struct Solution {
             }
         };
 
-        for (int step = 0; step < 20; step++) {
+        for (uint32_t step = 0; step < 20; step++) {
             do_step();
         }
 
@@ -1065,22 +1072,22 @@ struct Solution {
         if (changes_stack[t].size() > 15) {
             changes_stack[t].pop_back();
 
-            vector<pair<double, int>> kek;
-            for (int j: js[t]) {
+            vector<pair<double, uint32_t>> kek;
+            for (uint32_t j: js[t]) {
                 auto [TBS, n, t0, t1] = requests[j];
                 if (add_g[t][n] + main_total_g[j] - main_add_g[t][n] < TBS) {
                     kek.emplace_back(add_g[t][n] + main_total_g[j] - main_add_g[t][n] - TBS, n);
                 }
             }
             sort(kek.begin(), kek.end(), greater<>());
-            int threshold = kek.size() / 2;
+            uint32_t threshold = kek.size() / 2;
             while (kek.size() > threshold) {
                 auto [weight, n] = kek.back();
                 kek.pop_back();
 
 
-                for (int k = 0; k < K; k++) {
-                    for (int r = 0; r < R; r++) {
+                for (uint32_t k = 0; k < K; k++) {
+                    for (uint32_t r = 0; r < R; r++) {
                         if (p[t][r][n][k] != 0) {
                             change_power(t, n, k, r, -p[t][r][n][k]);
                         }
@@ -1093,7 +1100,7 @@ struct Solution {
         }
     }
 
-    void set_nice_power(int t) {
+    void set_nice_power(uint32_t t) {
         if (js[t].empty()) {
             return;
         }
@@ -1106,7 +1113,7 @@ struct Solution {
     }
 
     void solve() {
-        for (int t = 0; t < T; t++) {
+        for (uint32_t t = 0; t < T; t++) {
             if (!js[t].empty()) {
                 value_in_Q[t] = js[t].size() - 1e5; // TODO: может менее строже?
                 Q.insert({value_in_Q[t], t});
@@ -1128,13 +1135,13 @@ struct Solution {
                 }
             }
 
-            int best_time = -1;
+            uint32_t best_time = -1;
 
             {
                 for (auto it = Q.begin(); it != Q.end(); it++) {
-                    int t = it->second;
-                    int count_accepted = 0;
-                    for (int j: js[t]) {
+                    uint32_t t = it->second;
+                    uint32_t count_accepted = 0;
+                    for (uint32_t j: js[t]) {
                         auto [TBS, n, t0, t1] = requests[j];
                         count_accepted += main_total_g[j] > TBS;
                     }
@@ -1157,27 +1164,19 @@ struct Solution {
 
             {
                 value_in_Q[best_time] = calc_value_in_Q(best_time);
-                /*weight += count_visited[best_time] * count_visited[best_time];
-                int count_accepted = 0;
-                for (int j: js[best_time]) {
-                    auto [TBS, n, t0, t1] = requests[j];
-                    count_accepted += main_total_g[j] > TBS;
-                }
-                weight += count_accepted * 1.0 / (int) js[best_time].size() * 5;*/
-
                 Q.insert({value_in_Q[best_time], best_time});
             }
         }
 #ifndef FAST_STREAM
-        int sum_count = 0;
-        for (int t = 0; t < T; t++) {
+        uint32_t sum_count = 0;
+        for (uint32_t t = 0; t < T; t++) {
             sum_count += count_visited[t];
         }
         cout << "total count visited: " << sum_count << ' ' << sum_count * 1.0 / T << endl;
 
-        for (int t = 0; t < T; t++) {
-            int count_accepted = 0;
-            for (int j: js[t]) {
+        for (uint32_t t = 0; t < T; t++) {
+            uint32_t count_accepted = 0;
+            for (uint32_t j: js[t]) {
                 auto [TBS, n, t0, t1] = requests[j];
                 count_accepted += main_total_g[j] > TBS;
             }
@@ -1188,22 +1187,22 @@ struct Solution {
 
     double get_score() {
         double power_sum = 0;
-        for (int t = 0; t < T; t++) {
-            for (int n = 0; n < N; n++) {
-                for (int k = 0; k < K; k++) {
-                    for (int r = 0; r < R; r++) {
+        for (uint32_t t = 0; t < T; t++) {
+            for (uint32_t n = 0; n < N; n++) {
+                for (uint32_t k = 0; k < K; k++) {
+                    for (uint32_t r = 0; r < R; r++) {
                         power_sum += main_p[t][r][n][k];
                         p[t][r][n][k] = main_p[t][r][n][k];
                     }
                 }
             }
         }
-        int X = 0;
-        for (int j = 0; j < J; j++) {
+        uint32_t X = 0;
+        for (uint32_t j = 0; j < J; j++) {
             auto [TBS, n, t0, t1] = requests[j];
 #ifdef DEBUG_MODE
             double g = 0;
-            for (int t = t0; t <= t1; t++) {
+            for (uint32_t t = t0; t <= t1; t++) {
                 g += get_g(t, n);
             }
             ASSERT(high_equal(g, main_total_g[j]), "oh ho :_(");
@@ -1213,18 +1212,18 @@ struct Solution {
         return X - 1e-6 * power_sum;
     }
 
-    double correct_get_g(int t, int n) {
+    double correct_get_g(uint32_t t, uint32_t n) {
         vector<vector<double>> dp_s0_p_d(K, vector<double>(R));
 
         // update dp_s0_p_d
         {
             // dp_sum[k][r]
             vector<vector<double>> dp_sum(K, vector<double>(R));
-            for (int m = 0; m < N; m++) {
+            for (uint32_t m = 0; m < N; m++) {
                 if (m != n) {
-                    for (int k = 0; k < K; k++) {
-                        for (int r = 0; r < R; r++) {
-                            dp_sum[k][r] += s0[t][n][k][r] * p[t][r][m][k] /
+                    for (uint32_t k = 0; k < K; k++) {
+                        for (uint32_t r = 0; r < R; r++) {
+                            dp_sum[k][r] += s0[t][r][k][n] * p[t][r][m][k] /
                                             exp_d[n][m][k][r];
                         }
                     }
@@ -1232,31 +1231,31 @@ struct Solution {
             }
 
             vector<double> dp_sum_2(R);
-            for (int k = 0; k < K; k++) {
-                for (int r = 0; r < R; r++) {
+            for (uint32_t k = 0; k < K; k++) {
+                for (uint32_t r = 0; r < R; r++) {
                     dp_sum_2[r] += dp_sum[k][r];
                 }
             }
 
-            for (int k = 0; k < K; k++) {
-                for (int r = 0; r < R; r++) {
+            for (uint32_t k = 0; k < K; k++) {
+                for (uint32_t r = 0; r < R; r++) {
                     dp_s0_p_d[k][r] = 1 + dp_sum_2[r] - dp_sum[k][r];
                 }
             }
         }
 
         double sum = 0;
-        for (int k = 0; k < K; k++) {
+        for (uint32_t k = 0; k < K; k++) {
             double accum_prod = 1;
-            int count = 0;
-            for (int r = 0; r < R; r++) {
+            uint32_t count = 0;
+            for (uint32_t r = 0; r < R; r++) {
                 if (p[t][r][n][k] > 0) {
                     count++;
                     accum_prod *= p[t][r][n][k];
-                    accum_prod *= s0[t][n][k][r];
+                    accum_prod *= s0[t][r][k][n];
                     accum_prod /= dp_s0_p_d[k][r];
 
-                    for (int m = 0; m < N; m++) {
+                    for (uint32_t m = 0; m < N; m++) {
                         if (n != m) {
                             if (p[t][r][m][k] > 0) {
                                 accum_prod *= exp_d_2[n][k][r][m];
@@ -1274,18 +1273,18 @@ struct Solution {
         return 192 * sum;
     }
 
-    double get_g(int t, int n) {
+    double get_g(uint32_t t, uint32_t n) {
         return correct_get_g(t, n);
 
         double sum = 0;
-        for (int k = 0; k < K; k++) {
+        for (uint32_t k = 0; k < K; k++) {
             double accum_prod = 1;
-            int count = 0;
-            for (int r = 0; r < R; r++) {
+            uint32_t count = 0;
+            for (uint32_t r = 0; r < R; r++) {
                 if (p[t][r][n][k] > 0) {
                     count++;
                     accum_prod *= p[t][r][n][k];
-                    accum_prod *= s0[t][n][k][r];
+                    accum_prod *= s0[t][r][k][n];
                 }
             }
             if (count != 0) {
@@ -1304,7 +1303,7 @@ int main() {
     std::cout.tie(0);
 
 #ifndef FAST_STREAM
-    for (int test_case = 2; test_case <= 2; test_case++) {
+    for (uint32_t test_case = 2; test_case <= 2; test_case++) {
         std::ifstream input("input.txt");
         if (test_case == 0) {
             input = std::ifstream("input.txt");
