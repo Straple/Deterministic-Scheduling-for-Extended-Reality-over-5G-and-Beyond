@@ -378,7 +378,7 @@ constexpr uint32_t MAX_T = 1000;
 constexpr uint32_t MAX_R = 10;
 constexpr uint32_t MAX_J = 5000;
 
-mt19937 rnd(42);
+mt19937 rnd(33);
 
 double get_rnd() {
     return rnd() * 1.0 / UINT_MAX;
@@ -406,15 +406,10 @@ struct Solution {
     // exp_d_2[n][k][r][m]
     double exp_d_2[MAX_N][MAX_K][MAX_R][MAX_N];
 
-    // exp_d_pow[n][m][k][r]
-    double exp_d_pow[MAX_N][MAX_N][MAX_K][MAX_R];
-
-    vector<request_t> requests;
-
     // p[t][r][n][k]
     double p[MAX_T][MAX_R][MAX_N][MAX_K];
 
-    double main_p[MAX_T][MAX_N][MAX_K][MAX_R];
+    double main_p[MAX_T][MAX_R][MAX_N][MAX_K];
 
     // main_total_g[j]
     double main_total_g[MAX_J];
@@ -428,8 +423,8 @@ struct Solution {
     // main_best_f[t]
     double main_best_f[MAX_T];
 
-    // dp_exp_d_prod[t][r][n][k]
-    double dp_exp_d_prod[MAX_T][MAX_R][MAX_N][MAX_K];
+    // dp_exp_d_prod[t][r][k][n]
+    double dp_exp_d_prod[MAX_T][MAX_R][MAX_K][MAX_N];
 
     // dp_s[t][r][n][k]
     double dp_s[MAX_T][MAX_R][MAX_N][MAX_K];
@@ -440,8 +435,8 @@ struct Solution {
     // dp_count[t][n][k]
     int dp_count[MAX_T][MAX_N][MAX_K];
 
-    // dp_denom_sum[t][r][n][k]
-    double dp_denom_sum[MAX_T][MAX_R][MAX_N][MAX_K];
+    // dp_denom_sum[t][r][k][n]
+    double dp_denom_sum[MAX_T][MAX_R][MAX_K][MAX_N];
 
     // dp_denom_sum_global_add[t][r][n]
     double dp_denom_sum_global_add[MAX_T][MAX_R][MAX_N];
@@ -457,8 +452,6 @@ struct Solution {
 
     vector<int> nms[MAX_T];
 
-    map<int, int> cast_n_to_j;
-
     // save_kr[t][n] = (k, r)
     int save_kr_index[MAX_T][MAX_N];
 
@@ -472,6 +465,8 @@ struct Solution {
 
     // changes_stack[t] = { (n, k, r, change) }
     vector<tuple<int, int, int, double>> changes_stack[MAX_T];
+
+    vector<request_t> requests;
 
     void read(
 #ifndef FAST_STREAM
@@ -513,7 +508,6 @@ struct Solution {
 #endif
                         exp_d[n][m][k][r] = exp(d[n][m][k][r]);
                         exp_d_2[n][k][r][m] = exp_d[n][m][k][r];
-                        exp_d_pow[n][m][k][r] = pow(exp_d[n][m][k][r], 3);
                     }
                 }
             }
@@ -559,10 +553,10 @@ struct Solution {
 
         for (int t = 0; t < T; t++) {
             for (int r = 0; r < R; r++) {
-                for (int n = 0; n < N; n++) {
-                    for (int k = 0; k < K; k++) {
-                        dp_exp_d_prod[t][r][n][k] = 1;
-                        dp_denom_sum[t][r][n][k] = 1;
+                for (int k = 0; k < K; k++) {
+                    for (int n = 0; n < N; n++) {
+                        dp_exp_d_prod[t][r][k][n] = 1;
+                        dp_denom_sum[t][r][k][n] = 1;
                     }
                 }
             }
@@ -570,7 +564,6 @@ struct Solution {
 
         for (int j = 0; j < J; j++) {
             auto [TBS, n, t0, t1] = requests[j];
-            cast_n_to_j[n] = j;
             for (int t = t0; t <= t1; t++) {
                 js[t].push_back(j);
                 nms[t].push_back(n);
@@ -607,10 +600,10 @@ struct Solution {
                 for (int r = 0; r < R; r++) {
                     for (int n = 0; n < N; n++) {
 #ifdef FAST_STREAM
-                        writeDouble(main_p[t][n][k][r]);
+                        writeDouble(main_p[t][r][n][k]);
                         writeChar(' ');
 #else
-                        cout << main_p[t][n][k][r] << ' ';
+                        cout << main_p[t][r][n][k] << ' ';
 #endif
                     }
 #ifdef FAST_STREAM
@@ -706,7 +699,7 @@ struct Solution {
             if (m != n) {
                 double x = change * s0_tkrn[t][k][r][m] / exp_d_2[n][k][r][m];
                 dp_denom_sum_global_add[t][r][m] += x;
-                dp_denom_sum[t][r][m][k] -= x;
+                dp_denom_sum[t][r][k][m] -= x;
             }
         }
 
@@ -719,7 +712,7 @@ struct Solution {
             dp_count[t][n][k]++;
             for (int m: nms[t]) {
                 if (n != m) {
-                    dp_exp_d_prod[t][r][m][k] *= exp_d_2[n][k][r][m];
+                    dp_exp_d_prod[t][r][k][m] *= exp_d_2[n][k][r][m];
                 }
             }
         } else if (p[t][r][n][k] == 0) {
@@ -727,17 +720,17 @@ struct Solution {
             dp_count[t][n][k]--;
             for (int m: nms[t]) {
                 if (n != m) {
-                    dp_exp_d_prod[t][r][m][k] /= exp_d_2[n][k][r][m];
+                    dp_exp_d_prod[t][r][k][m] /= exp_d_2[n][k][r][m];
                 }
             }
         }
 
-        for (int m: nms[t]) {
-            for (int k = 0; k < K; k++) {
+        for (int k = 0; k < K; k++) {
+            for (int m: nms[t]) {
                 dp_s[t][r][m][k] = p[t][r][m][k] * s0[t][m][k][r] /
-                                   (dp_denom_sum[t][r][m][k] +
+                                   (dp_denom_sum[t][r][k][m] +
                                     dp_denom_sum_global_add[t][r][m]) *
-                                   dp_exp_d_prod[t][r][m][k];
+                                   dp_exp_d_prod[t][r][k][m];
             }
         }
 
@@ -864,7 +857,7 @@ struct Solution {
             for (int n = 0; n < N; n++) {
                 for (int k = 0; k < K; k++) {
                     for (int r = 0; r < R; r++) {
-                        main_p[t][n][k][r] = p[t][r][n][k];
+                        main_p[t][r][n][k] = p[t][r][n][k];
                     }
                 }
             }
@@ -899,7 +892,7 @@ struct Solution {
             for (int n = 0; n < N; n++) {
                 for (int k = 0; k < K; k++) {
                     for (int r = 0; r < R; r++) {
-                        swap(p[t][r][n][k], main_p[t][n][k][r]);
+                        swap(p[t][r][n][k], main_p[t][r][n][k]);
                     }
                 }
             }
@@ -922,7 +915,7 @@ struct Solution {
             for (int n = 0; n < N; n++) {
                 for (int k = 0; k < K; k++) {
                     for (int r = 0; r < R; r++) {
-                        swap(p[t][r][n][k], main_p[t][n][k][r]);
+                        swap(p[t][r][n][k], main_p[t][r][n][k]);
                     }
                 }
             }
@@ -931,7 +924,7 @@ struct Solution {
         return relaxed;
     }
 
-    void deterministic_descent(int t, const vector<int> &js) {
+    void deterministic_descent(int t) {
         update_add_g(t);
         if (relax_main_version(t)) {
             changes_stack[t].clear();
@@ -940,19 +933,19 @@ struct Solution {
         vector<bool> view(N);
         vector<bool> dont_touch(N);
 
-        for (int j: js) {
+        for (int j: js[t]) {
             auto [TBS, n, t0, t1] = requests[j];
             if (add_g[t][n] + main_total_g[j] - main_add_g[t][n] <= TBS) {
                 view[n] = true;
             } else {
-                view[n] = get_rnd() < 0.5;
+                view[n] = get_rnd() < (add_g[t][n] + main_total_g[j] - main_add_g[t][n]) / TBS - 0.9;
                 dont_touch[n] = !view[n];
             }
         }
 
         auto my_f = [&]() {
             double result = 0;
-            for (int j: js) {
+            for (int j: js[t]) {
                 auto [TBS, n, t0, t1] = requests[j];
                 if (view[n]) {
                     double x = 0;
@@ -989,7 +982,7 @@ struct Solution {
 
                     // add
                     {
-                        double add = calc_may_add_power(t, k, r, 1.0);
+                        double add = calc_may_add_power(t, k, r, 1.1);
                         if (add != 0) {
                             change_power(t, n, k, r, +add);
                             update_add_g(t);
@@ -1069,11 +1062,11 @@ struct Solution {
             }
         }*/
 
-        if (changes_stack[t].size() > 20) {
+        if (changes_stack[t].size() > 15) {
             changes_stack[t].pop_back();
 
             vector<pair<double, int>> kek;
-            for (int j: js) {
+            for (int j: js[t]) {
                 auto [TBS, n, t0, t1] = requests[j];
                 if (add_g[t][n] + main_total_g[j] - main_add_g[t][n] < TBS) {
                     kek.emplace_back(add_g[t][n] + main_total_g[j] - main_add_g[t][n] - TBS, n);
@@ -1090,17 +1083,18 @@ struct Solution {
                     for (int r = 0; r < R; r++) {
                         if (p[t][r][n][k] != 0) {
                             change_power(t, n, k, r, -p[t][r][n][k]);
-                            update_add_g(t);
-                            relax_main_version(t);
                         }
                     }
                 }
+
+                update_add_g(t);
+                relax_main_version(t);
             }
         }
     }
 
-    void set_nice_power(int t, const vector<int> &js) {
-        if (js.empty()) {
+    void set_nice_power(int t) {
+        if (js[t].empty()) {
             return;
         }
 
@@ -1108,7 +1102,7 @@ struct Solution {
         // что это значит? наверное мы хотим как можно больший прирост g
         // а также чтобы доотправлять сообщения
 
-        deterministic_descent(t, js);
+        deterministic_descent(t);
     }
 
     void solve() {
@@ -1159,7 +1153,7 @@ struct Solution {
 
             // наиболее оптимально расставим силу в момент времени best_time
             count_visited[best_time]++;
-            set_nice_power(best_time, js[best_time]);
+            set_nice_power(best_time);
 
             {
                 value_in_Q[best_time] = calc_value_in_Q(best_time);
@@ -1198,8 +1192,8 @@ struct Solution {
             for (int n = 0; n < N; n++) {
                 for (int k = 0; k < K; k++) {
                     for (int r = 0; r < R; r++) {
-                        power_sum += main_p[t][n][k][r];
-                        p[t][r][n][k] = main_p[t][n][k][r];
+                        power_sum += main_p[t][r][n][k];
+                        p[t][r][n][k] = main_p[t][r][n][k];
                     }
                 }
             }
@@ -1326,30 +1320,30 @@ int main() {
         cout << "TEST CASE==============\n";
 #endif
 
-    global_time_start = steady_clock::now();
-    global_time_finish = global_time_start + nanoseconds(1'900'000'000ULL);
+        global_time_start = steady_clock::now();
+        global_time_finish = global_time_start + nanoseconds(1'900'000'000ULL);
 
 #ifdef FAST_STREAM
-    solution.read();
+        solution.read();
 #else
-    solution.read(input);
+        solution.read(input);
 #endif
 
-    solution.solve();
+        solution.solve();
 
 #ifndef FAST_STREAM
-    auto time_stop = steady_clock::now();
-    auto duration = time_stop - global_time_start;
-    double time = duration_cast<nanoseconds>(duration).count() / 1e9;
-    cout << solution.get_score() << '/' << solution.J << ' ' << time << "s"
-         << endl;
-    cout << "ACCUM TIME: " << accum_time << "s" << endl;
-    accum_time = 0;
+        auto time_stop = steady_clock::now();
+        auto duration = time_stop - global_time_start;
+        double time = duration_cast<nanoseconds>(duration).count() / 1e9;
+        cout << solution.get_score() << '/' << solution.J << ' ' << time << "s"
+             << endl;
+        cout << "ACCUM TIME: " << accum_time << "s" << endl;
+        accum_time = 0;
 #endif
 
 
 #ifdef FAST_STREAM
-    solution.print();
+        solution.print();
 #endif
 
 #ifndef FAST_STREAM
