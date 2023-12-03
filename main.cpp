@@ -311,7 +311,7 @@ bool high_equal(double x, double y) {
     return abs(x - y) <= 1e-9 * max({abs(x), abs(y)});
 }
 
-//#define FAST_STREAM
+#define FAST_STREAM
 
 //#define PRINT_DEBUG_INFO
 
@@ -319,7 +319,7 @@ bool high_equal(double x, double y) {
 
 //#define VERIFY_DP
 
-#define DEBUG_MODE
+//#define DEBUG_MODE
 
 #ifdef DEBUG_MODE
 
@@ -343,6 +343,8 @@ bool high_equal(double x, double y) {
 #endif  // DEBUG_MODE
 
 time_point<steady_clock> global_time_start;
+
+time_point<steady_clock> global_time_finish;
 
 time_point<steady_clock> accum_time_start;
 
@@ -375,6 +377,12 @@ constexpr uint32_t MAX_K = 10;
 constexpr uint32_t MAX_T = 1000;
 constexpr uint32_t MAX_R = 10;
 constexpr uint32_t MAX_J = 5000;
+
+mt19937 rnd(42);
+
+double get_rnd() {
+    return rnd() * 1.0 / UINT_MAX;
+}
 
 struct Solution {
     int N;
@@ -671,8 +679,6 @@ struct Solution {
         }
 #endif
 
-        //double old_p = p[t][n][k][r];
-
         for (int m: nms[t]) {
             for (int k = 0; k < K; k++) {
                 if (p[t][m][k][r] > 0) {
@@ -838,7 +844,7 @@ struct Solution {
     }
 
     double calc_value_in_Q(int t) {
-        return count_visited[t] * count_visited[t] + 10 * main_best_f[t] / 1e6 / max(1, (int) js[t].size());
+        return count_visited[t] + 10 * main_best_f[t] / 1e6 / max(1, (int) js[t].size());
     }
 
     bool relax_main_version(int t) {
@@ -936,11 +942,6 @@ struct Solution {
         vector<bool> view(N);
         vector<bool> dont_touch(N);
 
-        static mt19937 rnd(42);
-        auto get_rnd = [&]() {
-            return rnd() * 1.0 / UINT_MAX;
-        };
-
         for (int j: js) {
             auto [TBS, n, t0, t1] = requests[j];
             if (add_g[t][n] + main_total_g[j] - main_add_g[t][n] <= TBS) {
@@ -980,8 +981,8 @@ struct Solution {
                 if (dont_touch[n]) {
                     continue;
                 }
+                int &i = save_kr_index[t][n];
                 for (int step = 0; step < 4; step++) {
-                    int &i = save_kr_index[t][n];
                     auto [k, r] = permute_kr[t][n][i];
                     i++;
                     if (i == permute_kr[t][n].size()) {
@@ -1008,21 +1009,19 @@ struct Solution {
                     }
 
                     // set zero
-                    {
-                        if (p[t][n][k][r] != 0) {
-                            double x = p[t][n][k][r];
-                            change_power(t, n, k, r, -x);
-                            update_add_g(t);
-                            double new_f = my_f();
-                            change_power(t, n, k, r, +x);
+                    if (p[t][n][k][r] != 0) {
+                        double x = p[t][n][k][r];
+                        change_power(t, n, k, r, -x);
+                        update_add_g(t);
+                        double new_f = my_f();
+                        change_power(t, n, k, r, +x);
 
-                            if (best_f < new_f) {
-                                best_f = new_f;
-                                best_n = n;
-                                best_k = k;
-                                best_r = r;
-                                best_add = -x;
-                            }
+                        if (best_f < new_f) {
+                            best_f = new_f;
+                            best_n = n;
+                            best_k = k;
+                            best_r = r;
+                            best_add = -x;
                         }
                     }
 
@@ -1132,9 +1131,7 @@ struct Solution {
 
             {
                 auto time_stop = steady_clock::now();
-                auto duration = time_stop - global_time_start;
-                double time = duration_cast<nanoseconds>(duration).count() / 1e9;
-                if (time > 1.8) {
+                if (time_stop > global_time_finish) {
                     break;
                 }
             }
@@ -1334,6 +1331,7 @@ int main() {
 #endif
 
         global_time_start = steady_clock::now();
+        global_time_finish = global_time_start + nanoseconds(1'900 * 1'000'000);
 
 #ifdef FAST_STREAM
         solution.read();
