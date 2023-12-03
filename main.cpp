@@ -1198,7 +1198,7 @@ struct Solution {
             }*/
         }
 
-        if (changes_stack[t].size() > 30) {
+        if (changes_stack[t].size() > 20) {
             changes_stack[t].pop_back();
 
             vector<pair<double, int>> kek;
@@ -1214,9 +1214,14 @@ struct Solution {
                 auto [weight, n] = kek.back();
                 kek.pop_back();
 
+
                 for (int k = 0; k < K; k++) {
                     for (int r = 0; r < R; r++) {
-                        change_power(t, n, k, r, -p[t][n][k][r]);
+                        if (p[t][n][k][r] != 0) {
+                            change_power(t, n, k, r, -p[t][n][k][r]);
+                            update_add_g(t);
+                            relax_main_version(t);
+                        }
                     }
                 }
             }
