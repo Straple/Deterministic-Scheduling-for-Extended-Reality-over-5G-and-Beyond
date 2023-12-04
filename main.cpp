@@ -647,8 +647,8 @@ struct Solution {
 
     double sum_power(uint32_t t, uint32_t n) {
         double sum = 0;
-        for (uint32_t k = 0; k < K; k++) {
-            for (uint32_t r = 0; r < R; r++) {
+        for (uint32_t r = 0; r < R; r++) {
+            for (uint32_t k = 0; k < K; k++) {
                 sum += p[t][r][n][k];
             }
         }
@@ -753,18 +753,21 @@ struct Solution {
         }
     }
 
+    double fooo(double g, double add_g, double TBS, uint32_t t, uint32_t n) {
+        // TODO: улучшить эту метрику
+        if (g > TBS) {
+            return 1e6 - sum_power(t, n) * 10;
+        } else {
+            return add_g - TBS;
+        }
+    }
+
     double correct_f(uint32_t t) {
         double result = 0;
         for (uint32_t j: js[t]) {
             auto [TBS, n, t0, t1] = requests[j];
             double g = get_g(t, n);
-            double x = 0;
-            if (g + main_total_g[j] - main_add_g[t][n] > TBS) {
-                x += 1e6;
-            } else {
-                x += g - TBS;
-            }
-            result += x;
+            result += fooo(g + main_total_g[j] - main_add_g[t][n], g, TBS, t, n);
         }
         return result;
     }
@@ -792,14 +795,7 @@ struct Solution {
         double result = 0;
         for (uint32_t j: js[t]) {
             auto [TBS, n, t0, t1] = requests[j];
-            double x = 0;
-            // TODO: улучшить эту метрику
-            if (add_g[t][n] + main_total_g[j] - main_add_g[t][n] > TBS) {
-                x += 1e6;
-            } else {
-                x += add_g[t][n] - TBS;
-            }
-            result += x;
+            result += fooo(add_g[t][n] + main_total_g[j] - main_add_g[t][n], add_g[t][n], TBS, t, n);
         }
 
 #ifdef DEBUG_MODE
@@ -891,13 +887,7 @@ struct Solution {
                     main_best_f[time] = 0;
                     for (uint32_t j: js[time]) {
                         auto [TBS, n, t0, t1] = requests[j];
-                        double x = 0;
-                        if (main_total_g[j] > TBS) {
-                            x += 1e6;
-                        } else {
-                            x += main_add_g[time][n] - TBS;
-                        }
-                        main_best_f[time] += x;
+                        main_best_f[time] += fooo(main_total_g[j], main_add_g[time][n], TBS, time, n);
                     }
 
                     // update Q
@@ -971,20 +961,13 @@ struct Solution {
             for (uint32_t j: js[t]) {
                 auto [TBS, n, t0, t1] = requests[j];
                 if (view[n]) {
-                    double x = 0;
-                    // TODO: улучшить эту метрику
-                    if (add_g[t][n] + main_total_g[j] - main_add_g[t][n] > TBS) {
-                        x += 1e6;
-                    } else {
-                        x += add_g[t][n] - TBS;
-                    }
-                    result += x;
+                    result += fooo(add_g[t][n] + main_total_g[j] - main_add_g[t][n], add_g[t][n], TBS, t, n);
                 }
             }
             return result;
         };
 
-        auto do_step = [&]() {  // NOLINT
+        auto do_step = [&]() { // NOLINT
             double best_f = -1e300;
             uint32_t best_n = -1;
             uint32_t best_k = -1;
@@ -1090,6 +1073,32 @@ struct Solution {
         if (changes_stack[t].size() > 15) {
             changes_stack[t].pop_back();
 
+            /*for (int j: js[t]) {
+                auto [TBS, n, t0, t1] = requests[j];
+                auto kek = permute_kr[t][n];
+                reverse(kek.begin(), kek.end());
+                for (auto [k, r]: kek) {
+                    double g = add_g[t][n] + main_total_g[j] - main_add_g[t][n];
+                    if (p[t][r][n][k] > 0) {
+                        double x = p[t][r][n][k] / 2;
+                        if (x < 0.1) {
+                            x = p[t][r][n][k];
+                        }
+                        change_power(t, n, k, r, -x);
+                        update_add_g(t);
+
+                        double new_g = add_g[t][n] + main_total_g[j] - main_add_g[t][n];
+                        if (new_g > g) {
+                            //cout << "completed: " << g << "->" << new_g << '\n';
+                        } else {
+                            change_power(t, n, k, r, +x);
+                        }
+                    }
+                }
+            }*/
+
+            relax_main_version(t);
+
             vector<pair<double, uint32_t>> kek;
             for (uint32_t j: js[t]) {
                 auto [TBS, n, t0, t1] = requests[j];
@@ -1102,7 +1111,6 @@ struct Solution {
             while (kek.size() > threshold) {
                 auto [weight, n] = kek.back();
                 kek.pop_back();
-
 
                 for (uint32_t k = 0; k < K; k++) {
                     for (uint32_t r = 0; r < R; r++) {
