@@ -1,6 +1,3 @@
-#pragma GCC optimization ("O3")
-#pragma GCC target("avx,avx2,fma")
-#pragma GCC optimize("Ofast")
 #pragma GCC optimization ("unroll-loops")
 
 #include <bits/stdc++.h>
@@ -74,7 +71,7 @@ namespace KopeliovichStream {
     inline void writeWord(const char *s);
 
     inline void
-    writeDouble(double x, int len = 10);  // works correct only for |x| < 2^{63}
+    writeDouble(double x, int len = 16);  // works correct only for |x| < 2^{63}
     inline void flush();
 
     static struct buffer_flusher_t {
@@ -600,7 +597,44 @@ struct Solution {
     }
 
     void print() {
-        //ofstream cout("output.txt");
+        for (uint32_t t = 0; t < T; t++) {
+            for (uint32_t k = 0; k < K; k++) {
+                double summm = 0;
+                for (uint32_t r = 0; r < R; r++) {
+                    double sum = 0;
+                    for (uint32_t n = 0; n < N; n++) {
+                        double &val = main_p[t][r][n][k];
+                        if (val < 0) {
+                            val = 0;
+                        }
+                        sum += val;
+                    }
+                    for (uint32_t n = 0; n < N && sum > 4; n++) {
+                        double &val = main_p[t][r][n][k];
+                        if (val > 0) {
+                            double x = min(val, sum - 4);
+                            val -= x;
+                            sum -= x;
+                        }
+                    }
+                    ASSERT(sum <= 4, "kek");
+                    summm += sum;
+                }
+                if(summm > R){
+                    for (uint32_t r = 0; r < R; r++) {
+                        for (uint32_t n = 0; n < N && summm > R; n++) {
+                            double &val = main_p[t][r][n][k];
+                            if (val > 0) {
+                                double x = min(val, summm - R);
+                                val -= x;
+                                summm -= x;
+                            }
+                        }
+                    }
+                }
+                ASSERT(summm <= R, "kek");
+            }
+        }
         for (uint32_t t = 0; t < T; t++) {
             for (uint32_t k = 0; k < K; k++) {
                 for (uint32_t r = 0; r < R; r++) {
@@ -697,6 +731,16 @@ struct Solution {
         }
         dp_power_sum[t][k][r] += change;
         dp_power_sum2[t][k] += change;
+
+        if (dp_power_sum[t][k][r] < 0) {
+            dp_power_sum[t][k][r] = 0;
+        }
+
+        if (dp_power_sum2[t][k] < 0) {
+            dp_power_sum2[t][k] = 0;
+        }
+
+        ASSERT(p[t][r][n][k] >= 0, "kek");
 
         ASSERT(!(p[t][r][n][k] != 0 && high_equal(p[t][r][n][k], 0)), ":_(");
         // ====================
@@ -829,7 +873,13 @@ struct Solution {
             for (uint32_t r = 0; r < R; r++) {
                 sum += dp_power_sum[t][k][r];
             }
-            ASSERT(high_equal(sum, dp_power_sum2[t][k]), "kek");
+            if (!high_equal(sum, dp_power_sum2[t][k])) {
+                cout << fixed << setprecision(50) << endl;
+                cout << "error:\n";
+                cout << sum << '\n';
+                cout << dp_power_sum2[t][k] << '\n' << endl;
+            }
+            //ASSERT(high_equal(sum, dp_power_sum2[t][k]), "kek");
             ASSERT(sum <= R + 1e-9, "fatal");
 #endif
             add = min(add, R - 1e-9 - dp_power_sum2[t][k]);
@@ -846,7 +896,7 @@ struct Solution {
             auto [TBS, n, t0, t1] = requests[j];
             count_accepted += main_total_g[j] > TBS;
         }
-        return (count_accepted == js[t].size()) * 100 * (1 + count_visited[t]) +
+        return (count_accepted == js[t].size()) * 1000 * (1 + count_visited[t]) +
                count_visited[t] +
                10 * main_best_f[t] / 1e6 / (js[t].size() + 1);
     }
@@ -943,31 +993,16 @@ struct Solution {
             changes_stack[t].clear();
         }
 
-        vector<bool> view(N);
         vector<bool> dont_touch(N);
 
         for (uint32_t j: js[t]) {
             auto [TBS, n, t0, t1] = requests[j];
             if (add_g[t][n] + main_total_g[j] - main_add_g[t][n] <= TBS) {
-                view[n] = true;
             } else {
-                view[n] = get_rnd() < 0.5;//(add_g[t][n] + main_total_g[j] - main_add_g[t][n]) / TBS - 0.9;
-                dont_touch[n] = !view[n];
+                bool view = get_rnd() < (add_g[t][n] + main_total_g[j] - main_add_g[t][n]) / TBS - 0.9;
+                dont_touch[n] = !view;
             }
         }
-
-        auto my_f = [&]() {
-            return fast_f(t);
-
-            double result = 0;
-            for (uint32_t j: js[t]) {
-                auto [TBS, n, t0, t1] = requests[j];
-                if (view[n]) {
-                    result += fooo(add_g[t][n] + main_total_g[j] - main_add_g[t][n], add_g[t][n], TBS, t, n);
-                }
-            }
-            return result;
-        };
 
         auto do_step = [&]() { // NOLINT
             double best_f = -1e300;
@@ -992,7 +1027,7 @@ struct Solution {
                             double x = p[t][r][n][k];
                             change_power(t, n, k, r, -x);
                             update_add_g(t);
-                            double new_f = my_f();
+                            double new_f = fast_f(t);
                             change_power(t, n, k, r, +x);
 
                             if (best_f < new_f) {
@@ -1009,7 +1044,7 @@ struct Solution {
                             if (sub > 0.1) {
                                 change_power(t, n, k, r, -sub);
                                 update_add_g(t);
-                                double new_f = my_f();
+                                double new_f = fast_f(t);
                                 change_power(t, n, k, r, +sub);
 
                                 if (best_f < new_f) {
@@ -1038,7 +1073,7 @@ struct Solution {
                         if (add != 0) {
                             change_power(t, n, k, r, +add);
                             update_add_g(t);
-                            double new_f = my_f();
+                            double new_f = fast_f(t);
                             change_power(t, n, k, r, -add);
 
                             if (best_f < new_f) {
@@ -1052,10 +1087,6 @@ struct Solution {
                     }
                 }
 
-                i++;
-                if (i == permute_kr[t][n].size()) {
-                    i = 0;
-                }
             }
 
             if (best_n == -1) {
@@ -1073,44 +1104,15 @@ struct Solution {
         const uint32_t steps_count = 25 - min(15U, count_visited[t]);
 
         for (uint32_t step = 0; step < steps_count; step++) {
+            auto time_stop = steady_clock::now();
+            if (time_stop > global_time_finish) {
+                return;
+            }
             do_step();
         }
 
-        // возвращение к main
-        /*if (changes_stack[t].size() > 50) {
-            while (!changes_stack[t].empty()) {
-                auto [n, k, r, change] = changes_stack[t].back();
-                changes_stack[t].pop_back();
-                change_power(t, n, k, r, -change);
-            }
-        }*/
-
         if (changes_stack[t].size() > 15) {
             changes_stack[t].pop_back();
-
-            /*for (int j: js[t]) {
-                auto [TBS, n, t0, t1] = requests[j];
-                auto kek = permute_kr[t][n];
-                reverse(kek.begin(), kek.end());
-                for (auto [k, r]: kek) {
-                    double g = add_g[t][n] + main_total_g[j] - main_add_g[t][n];
-                    if (p[t][r][n][k] > 0) {
-                        double x = p[t][r][n][k] / 2;
-                        if (x < 0.1) {
-                            x = p[t][r][n][k];
-                        }
-                        change_power(t, n, k, r, -x);
-                        update_add_g(t);
-
-                        double new_g = add_g[t][n] + main_total_g[j] - main_add_g[t][n];
-                        if (new_g > g) {
-                            //cout << "completed: " << g << "->" << new_g << '\n';
-                        } else {
-                            change_power(t, n, k, r, +x);
-                        }
-                    }
-                }
-            }*/
 
             vector<pair<double, uint32_t>> kek;
             for (uint32_t j: js[t]) {
@@ -1166,11 +1168,6 @@ struct Solution {
         while (true) {
             // выберем самое лучшее время, куда наиболее оптимально поставим
             // силу
-
-            /*for (int i = 0; i < 30; i++) {
-                set_nice_power(0);
-            }
-            exit(0);*/
 
             {
                 auto time_stop = steady_clock::now();
@@ -1363,28 +1360,28 @@ int main() {
         cout << "TEST CASE==============\n";
 #endif
 
-        global_time_start = steady_clock::now();
-        global_time_finish = global_time_start + nanoseconds(1'900'000'000ULL);
+    global_time_start = steady_clock::now();
+    global_time_finish = global_time_start + nanoseconds(1'800'000'000ULL);
 
 #ifdef FAST_STREAM
-        solution.read();
+    solution.read();
 #else
-        solution.read(input);
+    solution.read(input);
 #endif
 
-        solution.solve();
+    solution.solve();
 
 #ifndef FAST_STREAM
-        auto time_stop = steady_clock::now();
-        auto duration = time_stop - global_time_start;
-        double time = duration_cast<nanoseconds>(duration).count() / 1e9;
-        cout << solution.get_score() << '/' << solution.J << ' ' << time << "s" << endl;
-        cout << "ACCUM TIME: " << accum_time << "s" << endl;
-        accum_time = 0;
+    auto time_stop = steady_clock::now();
+    auto duration = time_stop - global_time_start;
+    double time = duration_cast<nanoseconds>(duration).count() / 1e9;
+    cout << solution.get_score() << '/' << solution.J << ' ' << time << "s" << endl;
+    cout << "ACCUM TIME: " << accum_time << "s" << endl;
+    accum_time = 0;
 #endif
 
 #ifdef FAST_STREAM
-        solution.print();
+    solution.print();
 #endif
 
 #ifndef FAST_STREAM
