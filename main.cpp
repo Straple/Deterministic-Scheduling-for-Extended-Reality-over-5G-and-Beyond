@@ -347,6 +347,8 @@ time_point<steady_clock> global_time_finish;
 
 time_point<steady_clock> accum_time_start;
 
+double clock_begin = clock();
+
 double accum_time = 0;
 
 void my_time_start() {
@@ -375,7 +377,7 @@ constexpr uint32_t MAX_N = 100;
 constexpr uint32_t MAX_K = 10;
 constexpr uint32_t MAX_T = 1000;
 constexpr uint32_t MAX_R = 10;
-constexpr uint32_t MAX_J = 5000;
+constexpr uint32_t MAX_J = 2000;
 
 mt19937 gen(33);
 static std::uniform_int_distribution<> dis(0, 100);
@@ -1104,8 +1106,13 @@ struct Solution {
         const uint32_t steps_count = 25 - min(15U, count_visited[t]);
 
         for (uint32_t step = 0; step < steps_count; step++) {
-            auto time_stop = steady_clock::now();
+            /*auto time_stop = steady_clock::now();
             if (time_stop > global_time_finish) {
+                return;
+            }*/
+            auto time_end = clock();
+            double duration = (time_end - clock_begin) / CLOCKS_PER_SEC;
+            if(duration > 1.9){
                 return;
             }
             do_step();
@@ -1170,9 +1177,14 @@ struct Solution {
             // силу
 
             {
-                auto time_stop = steady_clock::now();
+                /*auto time_stop = steady_clock::now();
                 if (time_stop > global_time_finish) {
                     break;
+                }*/
+                auto time_end = clock();
+                double duration = (time_end - clock_begin) / CLOCKS_PER_SEC;
+                if(duration > 1.9){
+                    return;
                 }
             }
 
@@ -1187,11 +1199,11 @@ struct Solution {
                         count_accepted += main_total_g[j] > TBS;
                     }
 
-                    if (count_accepted != js[t].size()) {
+                    //if (count_accepted != js[t].size()) {
                         best_time = t;
                         Q.erase(it);
                         break;
-                    }
+                    //}
                 }
             }
 
